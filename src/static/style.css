@@ -225,7 +225,7 @@ h2 {
 
 .gt-net  .gt-head, .gt-net  .gt-row { grid-template-columns: minmax(36px, 1fr) 68px 68px 64px; }
 .gt-io   .gt-head, .gt-io   .gt-row { grid-template-columns: minmax(40px, 1fr) 72px 72px; }
-.gt-proc .gt-head, .gt-proc .gt-row { grid-template-columns: 48px minmax(60px, 1fr) 130px 76px; }
+.gt-proc .gt-head, .gt-proc .gt-row { grid-template-columns: 48px minmax(60px, 1fr) 30px 130px 76px; }
 .gt-docker .gt-head, .gt-docker .gt-row { grid-template-columns: 0.8fr 1fr 60px 44px 130px; }
 
 .gt .num { text-align: right; }
@@ -251,6 +251,9 @@ h2 {
 .state-running { color: var(--green); }
 .state-exited, .state-dead { color: var(--red); }
 .state-paused, .state-restarting { color: var(--yellow); }
+
+.st-r { color: var(--green); }
+.st-z { color: var(--red); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

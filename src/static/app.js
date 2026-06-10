@@ -38,6 +38,12 @@ function pctClass(p) {
   return p >= 90 ? "crit" : p >= 70 ? "warn" : "";
 }
 
+// chart time window label, e.g. "90s" or "6m"
+function fmtWindow() {
+  const s = Math.round(SPARK_LEN * intervalMs / 1000);
+  return s < 120 ? s + "s" : Math.round(s / 60) + "m";
+}
+
 function setBar(el, pct) {
   el.style.width = Math.min(100, pct) + "%";
   el.className = "bar-fill " + pctClass(pct);
@@ -66,7 +72,7 @@ function drawChart(canvas, series, max) {
   }
 
   const peak = max || Math.max(1, ...series.map((s) => Math.max(...s.data)));
-  const P = 2;
+  const P = 3;
   const xy = (buf, i) => [
     (i / (SPARK_LEN - 1)) * w,
     h - P - (Math.min(buf[i], peak) / peak) * (h - 2 * P)
@@ -77,7 +83,7 @@ function drawChart(canvas, series, max) {
     // area fill
     if (s.fill) {
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      grad.addColorStop(0, s.color + "4d");
+      grad.addColorStop(0, s.color + (s.alpha || "4d"));
       grad.addColorStop(1, s.color + "05");
       ctx.beginPath();
       ctx.moveTo(0, h);
@@ -94,7 +100,7 @@ function drawChart(canvas, series, max) {
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.strokeStyle = s.color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = s.width || 1.5;
     ctx.stroke();
   }
 }
@@ -119,6 +125,7 @@ function render(d) {
   $("cpu-total").className = "head-val " + pctClass(cpu);
   $("load").textContent = "load " + d.cpu.load_avg.map((l) => l.toFixed(2)).join(" ");
   push(hist.cpu, cpu);
+  $("cpu-max").textContent = "100% · " + fmtWindow();
   drawChart($("cpu-chart"), [{ data: hist.cpu, color: "#58a6ff", fill: true }], 100);
   $("cores").innerHTML = d.cpu.per_core_pct.map((p, i) =>
     `<div class="core"><span class="core-idx">${i}</span>` +
@@ -130,6 +137,7 @@ function render(d) {
   const memPct = d.memory.total ? (d.memory.used / d.memory.total) * 100 : 0;
   $("mem-label").textContent = `${fmtBytes(d.memory.used)} / ${fmtBytes(d.memory.total)} · ${memPct.toFixed(0)}%`;
   push(hist.mem, memPct);
+  $("mem-max").textContent = "100% · " + fmtWindow();
   drawChart($("mem-chart"), [{ data: hist.mem, color: "#3fb950", fill: true }], 100);
   if (d.memory.swap_total) {
     setBar($("swap-bar"), (d.memory.swap_used / d.memory.swap_total) * 100);
@@ -147,10 +155,10 @@ function render(d) {
   push(hist.rx, rx);
   push(hist.tx, tx);
   const netMax = Math.max(2e5, ...hist.rx, ...hist.tx) * 1.08;
-  $("net-max").textContent = fmtBytes(netMax, 1);
+  $("net-max").textContent = fmtBytes(netMax, 1) + " · " + fmtWindow();
   drawChart($("net-chart"), [
-    { data: hist.rx, color: "#58a6ff", fill: true },
-    { data: hist.tx, color: "#d29922", fill: false }
+    { data: hist.rx, color: "#58a6ff", fill: true, alpha: "38" },
+    { data: hist.tx, color: "#d29922", fill: false, width: 1.2 }
   ], netMax);
   const ifaces = d.net.filter((n) => n.rx_total + n.tx_total > 0)
     .sort((a, b) => (b.rx_bps + b.tx_bps) - (a.rx_bps + a.tx_bps)).slice(0, 4);
@@ -222,6 +230,7 @@ function render(d) {
   }
   $("proc-rows").innerHTML = procs.map((p) =>
     `<div class="gt-row"><span class="num dim">${p.pid}</span><span>${esc(p.name)}</span>` +
+    `<span class="${p.state === "R" ? "st-r" : p.state === "Z" ? "st-z" : "dim"}">${esc(p.state || "?")}</span>` +
     `<div class="cpu-cell"><div class="bar"><div class="bar-fill ${pctClass(p.cpu_pct)}" style="width:${Math.min(100, p.cpu_pct)}%"></div></div>` +
     `<span class="cpu-num">${p.cpu_pct.toFixed(1)}</span></div>` +
     `<span class="num">${fmtBytes(p.mem_bytes)}</span></div>`

@@ -148,6 +148,8 @@ pub struct Processes {
 pub struct Proc {
     pub pid: u32,
     pub name: String,
+    /// Single-letter state: R(un), S(leep), I(dle), Z(ombie), T(stopped), ?.
+    pub state: char,
     pub cpu_pct: f32,
     pub mem_bytes: u64,
 }

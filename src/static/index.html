@@ -25,7 +25,7 @@
       </div>
       <div class="chart">
         <canvas id="cpu-chart"></canvas>
-        <span class="chart-max">100%</span>
+        <span id="cpu-max" class="chart-max">100%</span>
       </div>
       <div id="cores" class="cores"></div>
     </section>
@@ -38,7 +38,7 @@
       </div>
       <div class="chart">
         <canvas id="mem-chart"></canvas>
-        <span class="chart-max">100%</span>
+        <span id="mem-max" class="chart-max">100%</span>
       </div>
       <div class="bar-line">
         <span class="bar-line-label">swap</span>
@@ -102,6 +102,7 @@
         <div class="gt-head" id="proc-head">
           <span class="num sortable" data-sort="pid">pid<i id="arr-pid"></i></span>
           <span class="sortable" data-sort="name">name<i id="arr-name"></i></span>
+          <span>st</span>
           <span class="num sortable" data-sort="cpu">cpu%<i id="arr-cpu"></i></span>
           <span class="num sortable" data-sort="mem">mem<i id="arr-mem"></i></span>
         </div>

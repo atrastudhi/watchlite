@@ -72,7 +72,10 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
 }
 
 fn asset(body: &'static str, content_type: &str) -> Response<std::io::Cursor<Vec<u8>>> {
-    Response::from_string(body).with_header(header("Content-Type", content_type))
+    // no-cache so a binary upgrade's embedded UI shows on plain refresh.
+    Response::from_string(body)
+        .with_header(header("Content-Type", content_type))
+        .with_header(header("Cache-Control", "no-cache"))
 }
 
 fn lock_or_recover<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {

@@ -12,15 +12,24 @@ pub fn top(sys: &System, n: usize) -> Processes {
         .processes()
         .values()
         .map(|p| {
-            match p.status() {
-                ProcessStatus::Run => running += 1,
-                ProcessStatus::Sleep | ProcessStatus::Idle => sleeping += 1,
-                ProcessStatus::Zombie => zombie += 1,
+            let state = match p.status() {
+                ProcessStatus::Run => 'R',
+                ProcessStatus::Sleep => 'S',
+                ProcessStatus::Idle => 'I',
+                ProcessStatus::Zombie => 'Z',
+                ProcessStatus::Stop => 'T',
+                _ => '?',
+            };
+            match state {
+                'R' => running += 1,
+                'S' | 'I' => sleeping += 1,
+                'Z' => zombie += 1,
                 _ => {}
             }
             Proc {
                 pid: p.pid().as_u32(),
                 name: p.name().to_string_lossy().into_owned(),
+                state,
                 cpu_pct: p.cpu_usage(),
                 mem_bytes: p.memory(),
             }
