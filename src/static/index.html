@@ -68,9 +68,10 @@
       <div id="disks" class="stack"></div>
     </section>
 
-    <section class="panel" id="panel-diskio" hidden>
+    <section class="panel" id="panel-diskio">
       <h2>Disk I/O</h2>
       <div id="diskio-table" class="gt gt-io"></div>
+      <div id="diskio-na" class="na" hidden>not supported on this platform</div>
     </section>
 
     <section class="panel" id="panel-sensors" hidden>
@@ -79,14 +80,17 @@
       <div id="fans" class="subline"></div>
     </section>
 
-    <section class="panel" id="panel-conns" hidden>
+    <section class="panel" id="panel-conns">
       <h2>Connections</h2>
-      <div class="conn-stats">
-        <div class="conn-stat"><span id="conn-est" class="conn-num"></span><span class="conn-cap">established</span></div>
-        <div class="conn-stat"><span id="conn-tw" class="conn-num dim"></span><span class="conn-cap">time-wait</span></div>
+      <div id="conns-body">
+        <div class="conn-stats">
+          <div class="conn-stat"><span id="conn-est" class="conn-num"></span><span class="conn-cap">established</span></div>
+          <div class="conn-stat"><span id="conn-tw" class="conn-num dim"></span><span class="conn-cap">time-wait</span></div>
+        </div>
+        <div class="conn-cap listen-cap">listening</div>
+        <div id="listen-ports" class="ports"></div>
       </div>
-      <div class="conn-cap listen-cap">listening</div>
-      <div id="listen-ports" class="ports"></div>
+      <div id="conns-na" class="na" hidden>not supported on this platform</div>
     </section>
   </div>
 

@@ -13,7 +13,11 @@
   --accent: #58a6ff;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
 
 [hidden] { display: none !important; }
 
@@ -180,11 +184,15 @@ h2 {
 .stack-row .label .fs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stack-row .label .val { font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
 
+#temps { overflow-y: auto; max-height: 150px; }
+
 .sensor-row { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--dim); }
 .sensor-row .s-label { width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; color: var(--fg); }
 .sensor-row .s-val { text-align: right; font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
 
 .subline { color: var(--dim); font-size: 10px; margin-top: 6px; }
+
+.na { color: var(--faint); font-size: 10px; padding: 6px 0; }
 
 /* ---------- connections ---------- */
 
@@ -208,8 +216,8 @@ h2 {
 /* ---------- grid tables ---------- */
 
 .gt { display: flex; flex-direction: column; min-height: 0; }
-.gt-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.gt-proc, .gt-docker { flex: 1; }
+.gt-body { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.gt-proc, .gt-docker { flex: 1; min-height: 0; }
 
 .gt-head, .gt-row { display: grid; gap: 0 8px; align-items: center; }
 
