@@ -2,6 +2,8 @@
 
 An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.github.io/glances/) for server monitoring.
 
+![watchlite dashboard](readme.gif)
+
 - **~500 KB static binary**, ~10 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
 - **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, top processes with state counts, Docker containers

@@ -5,15 +5,19 @@ const SPARK_LEN = 180;
 
 let intervalMs = 2000;
 let timer = null;
-let procTab = "cpu";
+let lastData = null;
+let sortKey = "cpu";
+let sortDir = -1;
 
-// ring buffers for sparklines
+// ring buffers for charts
 const hist = { cpu: [], mem: [], rx: [], tx: [] };
 
 function push(buf, v) {
   buf.push(v);
   if (buf.length > SPARK_LEN) buf.shift();
 }
+
+/* ---------- formatting ---------- */
 
 function fmtBytes(b, perSec) {
   if (b == null) return "-";
@@ -34,114 +38,158 @@ function pctClass(p) {
   return p >= 90 ? "crit" : p >= 70 ? "warn" : "";
 }
 
-function setGauge(el, pct) {
+function setBar(el, pct) {
   el.style.width = Math.min(100, pct) + "%";
-  el.className = "gauge-fill " + pctClass(pct);
-}
-
-function drawSpark(canvas, series, colors, max) {
-  const ctx = canvas.getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  const peak = max || Math.max(1, ...series.flat());
-  series.forEach((buf, si) => {
-    if (buf.length < 2) return;
-    ctx.beginPath();
-    buf.forEach((v, i) => {
-      const x = (i / (SPARK_LEN - 1)) * w;
-      const y = h - (Math.min(v, peak) / peak) * (h - 2) - 1;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.strokeStyle = colors[si];
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  });
+  el.className = "bar-fill " + pctClass(pct);
 }
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+/* ---------- charts: gridlines + gradient area + line ---------- */
+
+function drawChart(canvas, series, max) {
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // gridlines at 25/50/75%
+  ctx.strokeStyle = "#181e27";
+  ctx.lineWidth = 1;
+  for (const f of [0.25, 0.5, 0.75]) {
+    const y = Math.round(h * f) + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  const peak = max || Math.max(1, ...series.map((s) => Math.max(...s.data)));
+  const P = 2;
+  const xy = (buf, i) => [
+    (i / (SPARK_LEN - 1)) * w,
+    h - P - (Math.min(buf[i], peak) / peak) * (h - 2 * P)
+  ];
+
+  for (const s of series) {
+    if (s.data.length < 2) continue;
+    // area fill
+    if (s.fill) {
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, s.color + "4d");
+      grad.addColorStop(1, s.color + "05");
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let i = 0; i < s.data.length; i++) { const [x, y] = xy(s.data, i); ctx.lineTo(x, y); }
+      ctx.lineTo(xy(s.data, s.data.length - 1)[0], h);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+    // line
+    ctx.beginPath();
+    for (let i = 0; i < s.data.length; i++) {
+      const [x, y] = xy(s.data, i);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+/* ---------- rendering ---------- */
+
 function render(d) {
   // header
   $("host-info").textContent =
-    `${d.host.hostname} · ${d.host.os} · ${d.host.kernel} · ${d.host.arch} · up ${fmtUptime(d.host.uptime_secs)}`;
+    `${d.host.hostname} · ${d.host.os} · ${d.host.kernel} · ${d.host.arch} · ${d.host.cpu_count} cores · up ${fmtUptime(d.host.uptime_secs)}`;
 
-  // alerts banner
+  // alert chip
   $("alerts").hidden = !d.alerts.length;
   if (d.alerts.length) {
-    $("alerts").textContent = "⚠ " + d.alerts.map((a) => {
-      const since = new Date(a.since * 1000).toLocaleTimeString();
-      return `${a.metric} ${a.value}% > ${a.threshold}% (since ${since})`;
-    }).join("   ");
+    $("alerts").textContent =
+      "▲ " + d.alerts.map((a) => `${a.metric} ${a.value}% > ${a.threshold}%`).join(" · ");
   }
 
   // cpu
   const cpu = d.cpu.total_pct;
   $("cpu-total").textContent = cpu.toFixed(1) + "%";
-  setGauge($("cpu-bar"), cpu);
+  $("cpu-total").className = "head-val " + pctClass(cpu);
+  $("load").textContent = "load " + d.cpu.load_avg.map((l) => l.toFixed(2)).join(" ");
   push(hist.cpu, cpu);
-  drawSpark($("cpu-spark"), [hist.cpu], ["#58a6ff"], 100);
+  drawChart($("cpu-chart"), [{ data: hist.cpu, color: "#58a6ff", fill: true }], 100);
   $("cores").innerHTML = d.cpu.per_core_pct.map((p, i) =>
-    `<div class="core">${i}<div class="gauge"><div class="gauge-fill ${pctClass(p)}" style="width:${Math.min(100, p)}%"></div></div></div>`
+    `<div class="core"><span class="core-idx">${i}</span>` +
+    `<div class="bar"><div class="bar-fill ${pctClass(p)}" style="width:${Math.min(100, p)}%"></div></div>` +
+    `<span class="core-pct">${p.toFixed(0)}%</span></div>`
   ).join("");
-  $("load").textContent = `load ${d.cpu.load_avg.map((l) => l.toFixed(2)).join(" / ")} · ${d.host.cpu_count} cores`;
 
   // memory
   const memPct = d.memory.total ? (d.memory.used / d.memory.total) * 100 : 0;
-  $("mem-label").textContent = `${fmtBytes(d.memory.used)} / ${fmtBytes(d.memory.total)} (${memPct.toFixed(0)}%)`;
-  setGauge($("mem-bar"), memPct);
+  $("mem-label").textContent = `${fmtBytes(d.memory.used)} / ${fmtBytes(d.memory.total)} · ${memPct.toFixed(0)}%`;
   push(hist.mem, memPct);
-  drawSpark($("mem-spark"), [hist.mem], ["#3fb950"], 100);
-  $("swap").textContent = d.memory.swap_total
-    ? `swap ${fmtBytes(d.memory.swap_used)} / ${fmtBytes(d.memory.swap_total)}`
-    : "no swap";
+  drawChart($("mem-chart"), [{ data: hist.mem, color: "#3fb950", fill: true }], 100);
+  if (d.memory.swap_total) {
+    setBar($("swap-bar"), (d.memory.swap_used / d.memory.swap_total) * 100);
+    $("swap-bar").classList.add("dim");
+    $("swap-label").textContent = `${fmtBytes(d.memory.swap_used)} / ${fmtBytes(d.memory.swap_total)}`;
+  } else {
+    $("swap-label").textContent = "no swap";
+  }
 
   // network
   const rx = d.net.reduce((a, n) => a + n.rx_bps, 0);
   const tx = d.net.reduce((a, n) => a + n.tx_bps, 0);
-  $("net-total").textContent = `↓ ${fmtBytes(rx, 1)}  ↑ ${fmtBytes(tx, 1)}`;
+  $("net-rx").textContent = "↓ " + fmtBytes(rx, 1);
+  $("net-tx").textContent = "↑ " + fmtBytes(tx, 1);
   push(hist.rx, rx);
   push(hist.tx, tx);
-  drawSpark($("net-spark"), [hist.rx, hist.tx], ["#58a6ff", "#d29922"]);
+  const netMax = Math.max(2e5, ...hist.rx, ...hist.tx) * 1.08;
+  $("net-max").textContent = fmtBytes(netMax, 1);
+  drawChart($("net-chart"), [
+    { data: hist.rx, color: "#58a6ff", fill: true },
+    { data: hist.tx, color: "#d29922", fill: false }
+  ], netMax);
   const ifaces = d.net.filter((n) => n.rx_total + n.tx_total > 0)
-    .sort((a, b) => (b.rx_bps + b.tx_bps) - (a.rx_bps + a.tx_bps)).slice(0, 8);
+    .sort((a, b) => (b.rx_bps + b.tx_bps) - (a.rx_bps + a.tx_bps)).slice(0, 4);
   $("net-table").innerHTML =
-    `<tr><th>iface</th><th class="num">rx/s</th><th class="num">tx/s</th><th class="num">rx total</th><th class="num">tx total</th></tr>` +
+    `<div class="gt-head"><span>iface</span><span class="num">rx/s</span><span class="num">tx/s</span><span class="num">total</span></div>` +
     ifaces.map((n) =>
-      `<tr><td>${esc(n.iface)}</td><td class="num">${fmtBytes(n.rx_bps, 1)}</td><td class="num">${fmtBytes(n.tx_bps, 1)}</td>` +
-      `<td class="num">${fmtBytes(n.rx_total)}</td><td class="num">${fmtBytes(n.tx_total)}</td></tr>`
+      `<div class="gt-row"><span>${esc(n.iface)}</span>` +
+      `<span class="num">${fmtBytes(n.rx_bps, 1)}</span><span class="num">${fmtBytes(n.tx_bps, 1)}</span>` +
+      `<span class="num dim">${fmtBytes(n.rx_total + n.tx_total)}</span></div>`
     ).join("");
 
   // disks
   $("disks").innerHTML = d.disks.map((dk) => {
     const pct = dk.total ? (dk.used / dk.total) * 100 : 0;
-    return `<div class="disk-row"><div class="label"><span><b>${esc(dk.mount)}</b> ${esc(dk.fs)}</span>` +
-      `<span>${fmtBytes(dk.used)} / ${fmtBytes(dk.total)} (${pct.toFixed(0)}%)</span></div>` +
-      `<div class="gauge small"><div class="gauge-fill ${pctClass(pct)}" style="width:${pct}%"></div></div></div>`;
+    return `<div class="stack-row"><div class="label">` +
+      `<b>${esc(dk.mount)}</b><span class="fs">${esc(dk.fs)}</span><span class="spacer"></span>` +
+      `<span class="val">${fmtBytes(dk.used).replace(/ [KMGT]?i?B$/, "")} / ${fmtBytes(dk.total)} · ${pct.toFixed(0)}%</span></div>` +
+      `<div class="bar"><div class="bar-fill ${pctClass(pct)}" style="width:${pct}%"></div></div></div>`;
   }).join("");
 
   // disk io (linux only)
   $("panel-diskio").hidden = !d.disk_io;
   if (d.disk_io) {
     $("diskio-table").innerHTML =
-      `<tr><th>device</th><th class="num">read/s</th><th class="num">write/s</th></tr>` +
+      `<div class="gt-head"><span>device</span><span class="num">read/s</span><span class="num">write/s</span></div>` +
       d.disk_io.map((io) =>
-        `<tr><td>${esc(io.device)}</td><td class="num">${fmtBytes(io.read_bps, 1)}</td><td class="num">${fmtBytes(io.write_bps, 1)}</td></tr>`
+        `<div class="gt-row"><span>${esc(io.device)}</span>` +
+        `<span class="num rx">${fmtBytes(io.read_bps, 1)}</span><span class="num tx">${fmtBytes(io.write_bps, 1)}</span></div>`
       ).join("");
   }
 
   // connections (linux only)
   $("panel-conns").hidden = !d.connections;
   if (d.connections) {
-    $("conn-counts").textContent =
-      `${d.connections.established} established · ${d.connections.time_wait} time-wait`;
-    $("listen-ports").textContent = d.connections.listening.length
-      ? "listening: " + d.connections.listening.join(", ")
-      : "no listening ports";
+    $("conn-est").textContent = d.connections.established;
+    $("conn-tw").textContent = d.connections.time_wait;
+    $("listen-ports").innerHTML = d.connections.listening.length
+      ? d.connections.listening.map((p) => `<span class="port">${esc(p)}</span>`).join("")
+      : `<span class="subline">none</span>`;
   }
 
   // sensors
@@ -150,40 +198,50 @@ function render(d) {
     $("temps").innerHTML = d.sensors.temps.map((t) => {
       const crit = t.critical_c || 100;
       const pct = Math.min(100, (t.temp_c / crit) * 100);
-      return `<div class="disk-row"><div class="label"><span><b>${esc(t.label)}</b></span>` +
-        `<span>${t.temp_c.toFixed(1)}°C${t.critical_c ? " / " + t.critical_c.toFixed(0) + "°C" : ""}</span></div>` +
-        `<div class="gauge small"><div class="gauge-fill ${pctClass(pct)}" style="width:${pct}%"></div></div></div>`;
+      return `<div class="sensor-row"><span class="s-label">${esc(t.label)}</span>` +
+        `<div class="bar"><div class="bar-fill ${pctClass(pct)}" style="width:${pct}%"></div></div>` +
+        `<span class="s-val">${t.temp_c.toFixed(1)}°${t.critical_c ? " / " + t.critical_c.toFixed(0) + "°C" : ""}</span></div>`;
     }).join("");
     $("fans").textContent = d.sensors.fans.length
-      ? d.sensors.fans.map((f) => `${f.label}: ${f.rpm} rpm`).join(" · ")
+      ? d.sensors.fans.map((f) => `${f.label} ${f.rpm} rpm`).join(" · ")
       : "";
   }
 
-  // processes
+  // processes — merge top lists, sort client-side
   $("proc-total").textContent = `${d.processes.total} total · ${d.processes.running} running` +
-    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : "");
-  const list = procTab === "cpu" ? d.processes.top_cpu : d.processes.top_mem;
-  $("proc-table").innerHTML =
-    `<tr><th class="num">pid</th><th>name</th><th class="num">cpu% (1 core)</th><th class="num">mem</th></tr>` +
-    list.map((p) =>
-      `<tr><td class="num">${p.pid}</td><td>${esc(p.name)}</td>` +
-      `<td class="num">${p.cpu_pct.toFixed(1)}</td><td class="num">${fmtBytes(p.mem_bytes)}</td></tr>`
-    ).join("");
+    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : " · 0 zombie");
+  const byPid = new Map();
+  for (const p of [...d.processes.top_cpu, ...d.processes.top_mem]) byPid.set(p.pid, p);
+  const procs = [...byPid.values()].sort((a, b) => {
+    const va = sortKey === "cpu" ? a.cpu_pct : sortKey === "mem" ? a.mem_bytes : a[sortKey];
+    const vb = sortKey === "cpu" ? b.cpu_pct : sortKey === "mem" ? b.mem_bytes : b[sortKey];
+    return (sortKey === "name" ? String(va).localeCompare(String(vb)) : va - vb) * sortDir;
+  });
+  for (const k of ["pid", "name", "cpu", "mem"]) {
+    $("arr-" + k).textContent = sortKey === k ? (sortDir > 0 ? " ▴" : " ▾") : "";
+  }
+  $("proc-rows").innerHTML = procs.map((p) =>
+    `<div class="gt-row"><span class="num dim">${p.pid}</span><span>${esc(p.name)}</span>` +
+    `<div class="cpu-cell"><div class="bar"><div class="bar-fill ${pctClass(p.cpu_pct)}" style="width:${Math.min(100, p.cpu_pct)}%"></div></div>` +
+    `<span class="cpu-num">${p.cpu_pct.toFixed(1)}</span></div>` +
+    `<span class="num">${fmtBytes(p.mem_bytes)}</span></div>`
+  ).join("");
 
   // docker
   $("panel-docker").hidden = !d.docker;
   if (d.docker) {
-    $("docker-table").innerHTML =
-      `<tr><th>name</th><th>image</th><th>state</th><th class="num">cpu%</th><th class="num">mem</th><th class="num">limit</th></tr>` +
-      d.docker.containers.map((c) =>
-        `<tr><td>${esc(c.name)}</td><td>${esc(c.image)}</td>` +
-        `<td class="state-${esc(c.state)}">${esc(c.state)}</td>` +
-        `<td class="num">${c.state === "running" ? c.cpu_pct.toFixed(1) : "-"}</td>` +
-        `<td class="num">${c.state === "running" ? fmtBytes(c.mem_bytes) : "-"}</td>` +
-        `<td class="num">${c.state === "running" ? fmtBytes(c.mem_limit) : "-"}</td></tr>`
-      ).join("");
+    const running = d.docker.containers.filter((c) => c.state === "running").length;
+    $("docker-total").textContent = `${d.docker.containers.length} containers · ${running} running`;
+    $("docker-rows").innerHTML = d.docker.containers.map((c) =>
+      `<div class="gt-row"><span>${esc(c.name)}</span><span class="dim">${esc(c.image)}</span>` +
+      `<span class="state-${esc(c.state)}">${esc(c.state)}</span>` +
+      `<span class="num">${c.state === "running" ? c.cpu_pct.toFixed(1) : "-"}</span>` +
+      `<span class="num dim">${c.state === "running" ? fmtBytes(c.mem_bytes) + " / " + fmtBytes(c.mem_limit) : "-"}</span></div>`
+    ).join("");
   }
 }
+
+/* ---------- refresh loop ---------- */
 
 async function refresh() {
   try {
@@ -198,16 +256,36 @@ async function refresh() {
       clearInterval(timer);
       timer = setInterval(refresh, intervalMs);
     }
+    lastData = d;
     render(d);
   } catch {
     $("conn").className = "conn-dot lost";
   }
 }
 
-$("tab-cpu").onclick = () => { procTab = "cpu"; $("tab-cpu").classList.add("active"); $("tab-mem").classList.remove("active"); refresh(); };
-$("tab-mem").onclick = () => { procTab = "mem"; $("tab-mem").classList.add("active"); $("tab-cpu").classList.remove("active"); refresh(); };
+// sortable process headers
+$("proc-head").addEventListener("click", (e) => {
+  const th = e.target.closest("[data-sort]");
+  if (!th) return;
+  const key = th.dataset.sort;
+  sortDir = sortKey === key ? -sortDir : (key === "name" ? 1 : -1);
+  sortKey = key;
+  if (lastData) render(lastData);
+});
 
-// Seed sparklines from server-side history so charts survive page reloads.
+// clock
+function tickClock() { $("clock").textContent = new Date().toLocaleTimeString(); }
+tickClock();
+setInterval(tickClock, 1000);
+
+// redraw charts on resize
+let resizeT = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => { if (lastData) render(lastData); }, 150);
+});
+
+// Seed charts from server-side history so they survive page reloads.
 async function seedHistory() {
   try {
     const res = await fetch("/api/history");
@@ -220,7 +298,7 @@ async function seedHistory() {
       push(hist.rx, pts[i].rx);
       push(hist.tx, pts[i].tx);
     }
-  } catch { /* no history yet — sparklines fill in live */ }
+  } catch { /* no history yet — charts fill in live */ }
 }
 
 seedHistory().then(refresh);

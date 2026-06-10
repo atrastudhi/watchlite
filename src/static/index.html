@@ -9,69 +9,119 @@
 <body>
 <header>
   <div class="brand">watch<span>lite</span></div>
-  <div id="host-info" class="host-info">connecting…</div>
+  <div id="host-info" class="host-info">connecting&hellip;</div>
+  <div id="alerts" class="alert-chip" hidden></div>
+  <div id="clock" class="clock"></div>
   <div id="conn" class="conn-dot" title="connection status"></div>
 </header>
 
-<div id="alerts" class="alerts" hidden></div>
-
 <main>
-  <section class="panel" id="panel-cpu">
-    <h2>CPU <span id="cpu-total" class="metric"></span></h2>
-    <div class="gauge"><div id="cpu-bar" class="gauge-fill"></div></div>
-    <canvas id="cpu-spark" height="40"></canvas>
-    <div id="cores" class="cores"></div>
-    <div id="load" class="subline"></div>
-  </section>
+  <div class="row">
+    <section class="panel" id="panel-cpu">
+      <div class="panel-head">
+        <h2>CPU</h2>
+        <span id="load" class="head-dim"></span>
+        <span id="cpu-total" class="head-val"></span>
+      </div>
+      <div class="chart">
+        <canvas id="cpu-chart"></canvas>
+        <span class="chart-max">100%</span>
+      </div>
+      <div id="cores" class="cores"></div>
+    </section>
 
-  <section class="panel" id="panel-mem">
-    <h2>Memory <span id="mem-label" class="metric"></span></h2>
-    <div class="gauge"><div id="mem-bar" class="gauge-fill"></div></div>
-    <canvas id="mem-spark" height="40"></canvas>
-    <div id="swap" class="subline"></div>
-  </section>
+    <section class="panel" id="panel-mem">
+      <div class="panel-head">
+        <h2>Memory</h2>
+        <span class="spacer"></span>
+        <span id="mem-label" class="head-val"></span>
+      </div>
+      <div class="chart">
+        <canvas id="mem-chart"></canvas>
+        <span class="chart-max">100%</span>
+      </div>
+      <div class="bar-line">
+        <span class="bar-line-label">swap</span>
+        <div class="bar"><div id="swap-bar" class="bar-fill dim"></div></div>
+        <span id="swap-label" class="bar-line-val"></span>
+      </div>
+    </section>
 
-  <section class="panel" id="panel-net">
-    <h2>Network <span id="net-total" class="metric"></span></h2>
-    <canvas id="net-spark" height="40"></canvas>
-    <table id="net-table"></table>
-  </section>
+    <section class="panel" id="panel-net">
+      <div class="panel-head">
+        <h2>Network</h2>
+        <span class="spacer"></span>
+        <span id="net-rx" class="head-val rx"></span>
+        <span id="net-tx" class="head-val tx"></span>
+      </div>
+      <div class="chart">
+        <canvas id="net-chart"></canvas>
+        <span id="net-max" class="chart-max"></span>
+      </div>
+      <div id="net-table" class="gt gt-net"></div>
+    </section>
+  </div>
 
-  <section class="panel" id="panel-disks">
-    <h2>Disks</h2>
-    <div id="disks"></div>
-  </section>
+  <div class="row">
+    <section class="panel" id="panel-disks">
+      <h2>Disks</h2>
+      <div id="disks" class="stack"></div>
+    </section>
 
-  <section class="panel" id="panel-diskio" hidden>
-    <h2>Disk I/O</h2>
-    <table id="diskio-table"></table>
-  </section>
+    <section class="panel" id="panel-diskio" hidden>
+      <h2>Disk I/O</h2>
+      <div id="diskio-table" class="gt gt-io"></div>
+    </section>
 
-  <section class="panel" id="panel-conns" hidden>
-    <h2>Connections <span id="conn-counts" class="metric"></span></h2>
-    <div id="listen-ports" class="subline"></div>
-  </section>
+    <section class="panel" id="panel-sensors" hidden>
+      <h2>Sensors</h2>
+      <div id="temps" class="stack"></div>
+      <div id="fans" class="subline"></div>
+    </section>
 
-  <section class="panel" id="panel-sensors" hidden>
-    <h2>Sensors</h2>
-    <div id="temps"></div>
-    <div id="fans" class="subline"></div>
-  </section>
+    <section class="panel" id="panel-conns" hidden>
+      <h2>Connections</h2>
+      <div class="conn-stats">
+        <div class="conn-stat"><span id="conn-est" class="conn-num"></span><span class="conn-cap">established</span></div>
+        <div class="conn-stat"><span id="conn-tw" class="conn-num dim"></span><span class="conn-cap">time-wait</span></div>
+      </div>
+      <div class="conn-cap listen-cap">listening</div>
+      <div id="listen-ports" class="ports"></div>
+    </section>
+  </div>
 
-  <section class="panel wide" id="panel-procs">
-    <h2>Processes <span id="proc-total" class="metric"></span>
-      <span class="tabs">
-        <button id="tab-cpu" class="tab active">by CPU</button>
-        <button id="tab-mem" class="tab">by MEM</button>
-      </span>
-    </h2>
-    <table id="proc-table"></table>
-  </section>
+  <div class="row grow">
+    <section class="panel wide7" id="panel-procs">
+      <div class="panel-head">
+        <h2>Processes</h2>
+        <span id="proc-total" class="head-dim"></span>
+        <span class="spacer"></span>
+        <span class="head-hint">click headers to sort</span>
+      </div>
+      <div class="gt gt-proc">
+        <div class="gt-head" id="proc-head">
+          <span class="num sortable" data-sort="pid">pid<i id="arr-pid"></i></span>
+          <span class="sortable" data-sort="name">name<i id="arr-name"></i></span>
+          <span class="num sortable" data-sort="cpu">cpu%<i id="arr-cpu"></i></span>
+          <span class="num sortable" data-sort="mem">mem<i id="arr-mem"></i></span>
+        </div>
+        <div id="proc-rows" class="gt-body"></div>
+      </div>
+    </section>
 
-  <section class="panel wide" id="panel-docker" hidden>
-    <h2>Docker</h2>
-    <table id="docker-table"></table>
-  </section>
+    <section class="panel wide5" id="panel-docker" hidden>
+      <div class="panel-head">
+        <h2>Docker</h2>
+        <span id="docker-total" class="head-dim"></span>
+      </div>
+      <div class="gt gt-docker">
+        <div class="gt-head">
+          <span>name</span><span>image</span><span>state</span><span class="num">cpu%</span><span class="num">mem</span>
+        </div>
+        <div id="docker-rows" class="gt-body"></div>
+      </div>
+    </section>
+  </div>
 </main>
 
 <script src="/app.js"></script>
