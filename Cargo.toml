@@ -8,6 +8,8 @@ repository = "https://github.com/OWNER/watchlite"
 keywords = ["monitoring", "server", "dashboard", "metrics", "lightweight"]
 categories = ["command-line-utilities", "visualization"]
 rust-version = "1.79"
+# keep the published crate tiny — the gif and CI configs live in the repo only
+exclude = ["readme.gif", ".github/", "Dockerfile", ".dockerignore"]
 
 [dependencies]
 tiny_http = "0.12"

@@ -10,14 +10,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follo
 Initial release.
 
 ### Added
-- Single static binary serving an embedded web dashboard (dark, htop-style)
-- Metrics: CPU total/per-core, memory/swap, load average, uptime, disk usage,
-  disk I/O rates (Linux), network throughput, temperatures, fan speeds (Linux),
-  TCP connections + listening ports (Linux), top processes by CPU/memory with
-  state counts, Docker containers (CPU/memory via the unix socket)
-- `/api/stats` JSON endpoint, `/api/history` in-RAM ring buffer (1h default),
-  `/metrics` Prometheus text exposition
+- Single static binary serving an embedded web dashboard — dense htop-style
+  single-screen layout with gradient area charts, sortable process table,
+  zebra tables, live clock, and header alert chip
+- Metrics: CPU (model/frequency, total + per-core), memory/swap, load average,
+  uptime, disk usage, disk I/O rates (Linux), network throughput, temperatures,
+  fan speeds (Linux), TCP connections + listening ports (Linux), full process
+  list with states, Docker containers (CPU/memory via the unix socket)
+- `/api/stats` JSON endpoint, `/api/history` in-RAM ring buffer (1h default)
+  that seeds charts across page reloads, `/metrics` Prometheus text exposition
 - Threshold alerts (`--alert cpu>90`) with 3-tick hysteresis, stderr logging,
   and optional webhook delivery via curl
-- HTTP Basic auth (`--auth`), localhost bind by default
+- HTTP Basic auth (`--auth`), localhost bind by default, small handler thread
+  pool, no-cache asset serving so binary upgrades show immediately
 - Configuration via flags or `WATCHLITE_*` environment variables
+- Platform-aware panels: Linux-only collectors show a "not supported" note
+  on other platforms instead of hiding

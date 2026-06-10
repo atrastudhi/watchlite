@@ -5,18 +5,27 @@ use crate::state::SharedState;
 use tiny_http::{Header, Request, Response, Server};
 
 pub fn serve(config: &Config, state: SharedState) -> ! {
-    let server = Server::http(config.bind).unwrap_or_else(|e| {
+    let server = std::sync::Arc::new(Server::http(config.bind).unwrap_or_else(|e| {
         eprintln!("error: failed to bind {}: {e}", config.bind);
         std::process::exit(1);
-    });
+    }));
     eprintln!("watchlite listening on http://{}", config.bind);
 
+    // A few handler threads so one slow client can't stall the dashboard.
+    for _ in 0..3 {
+        let server = server.clone();
+        let config = config.clone();
+        let state = state.clone();
+        std::thread::spawn(move || loop {
+            if let Ok(request) = server.recv() {
+                handle(request, &config, &state);
+            }
+        });
+    }
     loop {
-        let request = match server.recv() {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-        handle(request, config, &state);
+        if let Ok(request) = server.recv() {
+            handle(request, config, &state);
+        }
     }
 }
 

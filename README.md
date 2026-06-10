@@ -4,9 +4,9 @@ An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.g
 
 ![watchlite dashboard](readme.gif)
 
-- **~500 KB static binary**, ~10 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
+- **Single static binary under 1 MB**, ~11 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
-- **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, top processes with state counts, Docker containers
+- **Metrics**: CPU (model, total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, full sortable process list with states, Docker containers
 - **History**: in-RAM ring buffer (1h default) — charts survive page reloads, served at `/api/history`
 - **Alerts**: `--alert cpu>90` style thresholds with hysteresis; events log to stderr and optionally POST to a webhook
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
