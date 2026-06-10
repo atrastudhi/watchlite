@@ -2,7 +2,7 @@
 
 An ultra-lightweight, single-binary server monitor with an embedded web dashboard — everything you need to glance at a box's health, in a binary smaller than a favicon.
 
-![watchlite dashboard](readme.gif)
+![watchlite dashboard](assets/dashboard.gif)
 
 - **Single static binary under 1 MB**, ~11 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
