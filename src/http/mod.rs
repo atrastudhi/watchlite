@@ -9,7 +9,7 @@ pub fn serve(config: &Config, state: SharedState) -> ! {
         eprintln!("error: failed to bind {}: {e}", config.bind);
         std::process::exit(1);
     });
-    eprintln!("atrasmon listening on http://{}", config.bind);
+    eprintln!("watchlite listening on http://{}", config.bind);
 
     loop {
         let request = match server.recv() {
@@ -30,7 +30,7 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
         if !ok {
             let resp = Response::from_string("401 Unauthorized")
                 .with_status_code(401)
-                .with_header(header("WWW-Authenticate", "Basic realm=\"atrasmon\""));
+                .with_header(header("WWW-Authenticate", "Basic realm=\"watchlite\""));
             let _ = request.respond(resp);
             return;
         }
@@ -60,7 +60,10 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
         "/metrics" => {
             let body = lock_or_recover(&state.prom).clone();
             Response::from_string(body)
-                .with_header(header("Content-Type", "text/plain; version=0.0.4; charset=utf-8"))
+                .with_header(header(
+                    "Content-Type",
+                    "text/plain; version=0.0.4; charset=utf-8",
+                ))
                 .with_header(header("Cache-Control", "no-store"))
         }
         _ => Response::from_string("404 Not Found").with_status_code(404),

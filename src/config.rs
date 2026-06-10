@@ -25,10 +25,10 @@ pub struct AlertSpec {
 }
 
 const USAGE: &str = "\
-atrasmon - ultra-lightweight server monitor
+watchlite - ultra-lightweight server monitor
 
 USAGE:
-    atrasmon [OPTIONS]
+    watchlite [OPTIONS]
 
 OPTIONS:
     --bind <ADDR>       Address to listen on (default: 127.0.0.1:8077)
@@ -41,11 +41,12 @@ OPTIONS:
     --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
                         metric one of cpu, mem, disk. Example: --alert cpu>90
     --webhook <URL>     POST alert events as JSON (uses curl; needed for https)
+    --version           Print version
     --help              Show this help
 
 ENVIRONMENT (flags take precedence):
-    ATRASMON_BIND, ATRASMON_INTERVAL, ATRASMON_TOP, ATRASMON_AUTH,
-    ATRASMON_HISTORY, ATRASMON_WEBHOOK
+    WATCHLITE_BIND, WATCHLITE_INTERVAL, WATCHLITE_TOP, WATCHLITE_AUTH,
+    WATCHLITE_HISTORY, WATCHLITE_WEBHOOK
 ";
 
 fn fail(msg: &str) -> ! {
@@ -55,12 +56,12 @@ fn fail(msg: &str) -> ! {
 
 impl Config {
     pub fn from_args() -> Config {
-        let mut bind = env::var("ATRASMON_BIND").unwrap_or_else(|_| "127.0.0.1:8077".into());
-        let mut interval = env::var("ATRASMON_INTERVAL").unwrap_or_else(|_| "2".into());
-        let mut top_n = env::var("ATRASMON_TOP").unwrap_or_else(|_| "10".into());
-        let mut auth = env::var("ATRASMON_AUTH").ok();
-        let mut history = env::var("ATRASMON_HISTORY").unwrap_or_else(|_| "3600".into());
-        let mut webhook = env::var("ATRASMON_WEBHOOK").ok();
+        let mut bind = env::var("WATCHLITE_BIND").unwrap_or_else(|_| "127.0.0.1:8077".into());
+        let mut interval = env::var("WATCHLITE_INTERVAL").unwrap_or_else(|_| "2".into());
+        let mut top_n = env::var("WATCHLITE_TOP").unwrap_or_else(|_| "10".into());
+        let mut auth = env::var("WATCHLITE_AUTH").ok();
+        let mut history = env::var("WATCHLITE_HISTORY").unwrap_or_else(|_| "3600".into());
+        let mut webhook = env::var("WATCHLITE_WEBHOOK").ok();
         let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
 
@@ -79,6 +80,10 @@ impl Config {
                 "--alert" => alert_specs.push(take("--alert")),
                 "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
+                "--version" | "-V" => {
+                    println!("watchlite {}", env!("CARGO_PKG_VERSION"));
+                    exit(0);
+                }
                 "--help" | "-h" => {
                     print!("{USAGE}");
                     exit(0);
@@ -114,9 +119,9 @@ impl Config {
         let alerts = alert_specs
             .iter()
             .map(|spec| {
-                let (metric, threshold) = spec
-                    .split_once('>')
-                    .unwrap_or_else(|| fail(&format!("invalid alert spec (want metric>percent): {spec}")));
+                let (metric, threshold) = spec.split_once('>').unwrap_or_else(|| {
+                    fail(&format!("invalid alert spec (want metric>percent): {spec}"))
+                });
                 if !["cpu", "mem", "disk"].contains(&metric) {
                     fail(&format!("unknown alert metric (cpu, mem, disk): {metric}"));
                 }
@@ -125,7 +130,10 @@ impl Config {
                     .ok()
                     .filter(|t| *t > 0.0 && *t < 100.0)
                     .unwrap_or_else(|| fail(&format!("invalid alert threshold: {spec}")));
-                AlertSpec { metric: metric.to_string(), threshold }
+                AlertSpec {
+                    metric: metric.to_string(),
+                    threshold,
+                }
             })
             .collect();
 
@@ -146,12 +154,39 @@ pub fn base64_encode(input: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
-        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
         let n = u32::from(b[0]) << 16 | u32::from(b[1]) << 8 | u32::from(b[2]);
         out.push(ALPHABET[(n >> 18) as usize & 63] as char);
         out.push(ALPHABET[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 { ALPHABET[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { ALPHABET[n as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            ALPHABET[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            ALPHABET[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::base64_encode;
+
+    #[test]
+    fn base64_rfc4648_vectors() {
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+        assert_eq!(base64_encode(b"admin:secret"), "YWRtaW46c2VjcmV0");
+    }
 }

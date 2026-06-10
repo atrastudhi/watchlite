@@ -42,7 +42,8 @@ pub fn run(state: SharedState, config: Config) {
     };
 
     let mut alert_engine = AlertEngine::new(&config);
-    let history_cap = (config.history.as_secs_f64() / config.interval.as_secs_f64()).ceil() as usize;
+    let history_cap =
+        (config.history.as_secs_f64() / config.interval.as_secs_f64()).ceil() as usize;
     let mut docker_was_up = false;
     let mut work = Duration::ZERO;
     loop {
@@ -98,13 +99,20 @@ pub fn run(state: SharedState, config: Config) {
         if config.docker && docker_is_up != docker_was_up {
             eprintln!(
                 "docker collector: {}",
-                if docker_is_up { "connected" } else { "unavailable" }
+                if docker_is_up {
+                    "connected"
+                } else {
+                    "unavailable"
+                }
             );
             docker_was_up = docker_is_up;
         }
 
         let mut snapshot = Snapshot {
-            ts: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+            ts: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
             interval_secs: config.interval.as_secs_f64(),
             host: system::host(&sys),
             cpu: system::cpu(&sys),

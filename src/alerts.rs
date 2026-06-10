@@ -28,7 +28,12 @@ impl AlertEngine {
             rules: config
                 .alerts
                 .iter()
-                .map(|spec| RuleState { spec: spec.clone(), over: 0, under: 0, firing_since: None })
+                .map(|spec| RuleState {
+                    spec: spec.clone(),
+                    over: 0,
+                    under: 0,
+                    firing_since: None,
+                })
                 .collect(),
             webhook: config.webhook.clone(),
             hostname: String::new(),
@@ -70,11 +75,23 @@ impl AlertEngine {
             match rule.firing_since {
                 None if rule.over >= HOLD_TICKS => {
                     rule.firing_since = Some(snap.ts);
-                    emit(&self.hostname, &rule.spec, value, "firing", self.webhook.as_deref());
+                    emit(
+                        &self.hostname,
+                        &rule.spec,
+                        value,
+                        "firing",
+                        self.webhook.as_deref(),
+                    );
                 }
                 Some(_) if rule.under >= HOLD_TICKS => {
                     rule.firing_since = None;
-                    emit(&self.hostname, &rule.spec, value, "resolved", self.webhook.as_deref());
+                    emit(
+                        &self.hostname,
+                        &rule.spec,
+                        value,
+                        "resolved",
+                        self.webhook.as_deref(),
+                    );
                 }
                 _ => {}
             }
@@ -105,7 +122,17 @@ fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&
         spec.threshold
     );
     let spawned = std::process::Command::new("curl")
-        .args(["-fsS", "-m", "5", "-X", "POST", "-H", "Content-Type: application/json", "-d", &payload])
+        .args([
+            "-fsS",
+            "-m",
+            "5",
+            "-X",
+            "POST",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &payload,
+        ])
         .arg(url)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -118,5 +145,108 @@ fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&
             });
         }
         Err(e) => eprintln!("alert webhook failed (is curl installed?): {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::*;
+
+    fn snapshot(cpu_pct: f32) -> Snapshot {
+        Snapshot {
+            ts: 1000,
+            interval_secs: 2.0,
+            host: Host {
+                hostname: "test".into(),
+                os: "test".into(),
+                kernel: "test".into(),
+                arch: "test".into(),
+                uptime_secs: 1,
+                cpu_count: 1,
+            },
+            cpu: Cpu {
+                total_pct: cpu_pct,
+                per_core_pct: vec![],
+                load_avg: [0.0; 3],
+            },
+            memory: Memory {
+                total: 100,
+                used: 50,
+                available: 50,
+                swap_total: 0,
+                swap_used: 0,
+            },
+            disks: vec![],
+            disk_io: None,
+            net: vec![],
+            processes: Processes {
+                total: 0,
+                running: 0,
+                sleeping: 0,
+                zombie: 0,
+                top_cpu: vec![],
+                top_mem: vec![],
+            },
+            docker: None,
+            sensors: None,
+            connections: None,
+            alerts: vec![],
+        }
+    }
+
+    fn engine(threshold: f64) -> AlertEngine {
+        AlertEngine {
+            rules: vec![RuleState {
+                spec: AlertSpec {
+                    metric: "cpu".into(),
+                    threshold,
+                },
+                over: 0,
+                under: 0,
+                firing_since: None,
+            }],
+            webhook: None,
+            hostname: String::new(),
+        }
+    }
+
+    #[test]
+    fn fires_only_after_hold_ticks() {
+        let mut e = engine(90.0);
+        assert!(e.eval(&snapshot(95.0)).is_empty());
+        assert!(e.eval(&snapshot(95.0)).is_empty());
+        assert_eq!(
+            e.eval(&snapshot(95.0)).len(),
+            1,
+            "fires on third consecutive tick"
+        );
+    }
+
+    #[test]
+    fn spike_does_not_fire() {
+        let mut e = engine(90.0);
+        assert!(e.eval(&snapshot(95.0)).is_empty());
+        assert!(e.eval(&snapshot(10.0)).is_empty());
+        assert!(e.eval(&snapshot(95.0)).is_empty());
+        assert!(e.eval(&snapshot(10.0)).is_empty());
+    }
+
+    #[test]
+    fn resolves_after_hold_ticks_below() {
+        let mut e = engine(90.0);
+        for _ in 0..3 {
+            e.eval(&snapshot(95.0));
+        }
+        assert_eq!(
+            e.eval(&snapshot(10.0)).len(),
+            1,
+            "still firing while under hold"
+        );
+        assert_eq!(e.eval(&snapshot(10.0)).len(), 1);
+        assert!(
+            e.eval(&snapshot(10.0)).is_empty(),
+            "resolves on third tick below"
+        );
     }
 }

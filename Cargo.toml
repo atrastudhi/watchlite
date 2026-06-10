@@ -1,9 +1,13 @@
 [package]
-name = "atrasmon"
+name = "watchlite"
 version = "0.1.0"
 edition = "2021"
 description = "Ultra-lightweight single-binary server monitor with embedded web dashboard"
 license = "MIT"
+repository = "https://github.com/OWNER/watchlite"
+keywords = ["monitoring", "server", "dashboard", "metrics", "lightweight"]
+categories = ["command-line-utilities", "visualization"]
+rust-version = "1.79"
 
 [dependencies]
 tiny_http = "0.12"

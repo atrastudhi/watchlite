@@ -31,8 +31,15 @@ pub fn top(sys: &System, n: usize) -> Processes {
     procs.sort_unstable_by(|a, b| b.cpu_pct.total_cmp(&a.cpu_pct));
     let top_cpu: Vec<Proc> = procs.iter().take(n).cloned().collect();
 
-    procs.sort_unstable_by(|a, b| b.mem_bytes.cmp(&a.mem_bytes));
+    procs.sort_unstable_by_key(|p| std::cmp::Reverse(p.mem_bytes));
     let top_mem: Vec<Proc> = procs.into_iter().take(n).collect();
 
-    Processes { total, running, sleeping, zombie, top_cpu, top_mem }
+    Processes {
+        total,
+        running,
+        sleeping,
+        zombie,
+        top_cpu,
+        top_mem,
+    }
 }

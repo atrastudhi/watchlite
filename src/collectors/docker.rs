@@ -99,10 +99,16 @@ pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
         };
 
         if s.state == "running" {
-            if let Some(stats) = get(&format!("{API}/containers/{}/stats?stream=false&one-shot=true", s.id))
-                .and_then(|b| serde_json::from_slice::<Stats>(&b).ok())
+            if let Some(stats) = get(&format!(
+                "{API}/containers/{}/stats?stream=false&one-shot=true",
+                s.id
+            ))
+            .and_then(|b| serde_json::from_slice::<Stats>(&b).ok())
             {
-                let cur = (stats.cpu_stats.cpu_usage.total_usage, stats.cpu_stats.system_cpu_usage);
+                let cur = (
+                    stats.cpu_stats.cpu_usage.total_usage,
+                    stats.cpu_stats.system_cpu_usage,
+                );
                 if let Some(&(prev_total, prev_sys)) = prev_cpu.get(&s.id) {
                     let cpu_delta = cur.0.saturating_sub(prev_total) as f64;
                     let sys_delta = cur.1.saturating_sub(prev_sys) as f64;
@@ -116,7 +122,11 @@ pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
                 let m = &stats.memory_stats;
                 // cgroup v2 reports inactive_file; v1 reports cache. Subtract
                 // whichever is present so page cache doesn't count as "used".
-                let reclaimable = if m.stats.inactive_file > 0 { m.stats.inactive_file } else { m.stats.cache };
+                let reclaimable = if m.stats.inactive_file > 0 {
+                    m.stats.inactive_file
+                } else {
+                    m.stats.cache
+                };
                 c.mem_bytes = m.usage.saturating_sub(reclaimable);
                 c.mem_limit = m.limit;
             }
@@ -133,8 +143,14 @@ pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
 fn get(path: &str) -> Option<Vec<u8>> {
     let mut stream = UnixStream::connect(SOCKET).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_secs(3))).ok()?;
-    write!(stream, "GET {path} HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n").ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .ok()?;
+    write!(
+        stream,
+        "GET {path} HTTP/1.1\r\nHost: docker\r\nConnection: close\r\n\r\n"
+    )
+    .ok()?;
 
     let mut raw = Vec::with_capacity(8192);
     stream.take(8 * 1024 * 1024).read_to_end(&mut raw).ok()?;
@@ -147,7 +163,10 @@ fn get(path: &str) -> Option<Vec<u8>> {
     }
     let body = &raw[header_end..];
 
-    if headers.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+    if headers
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked")
+    {
         decode_chunked(body)
     } else {
         Some(body.to_vec())

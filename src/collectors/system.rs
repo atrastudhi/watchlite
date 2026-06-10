@@ -4,7 +4,8 @@ use sysinfo::System;
 pub fn host(sys: &System) -> Host {
     Host {
         hostname: System::host_name().unwrap_or_else(|| "unknown".into()),
-        os: System::long_os_version().unwrap_or_else(|| System::name().unwrap_or_else(|| "unknown".into())),
+        os: System::long_os_version()
+            .unwrap_or_else(|| System::name().unwrap_or_else(|| "unknown".into())),
         kernel: System::kernel_version().unwrap_or_else(|| "unknown".into()),
         arch: System::cpu_arch(),
         uptime_secs: System::uptime(),

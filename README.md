@@ -1,4 +1,4 @@
-# atrasmon
+# watchlite
 
 An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.github.io/glances/) for server monitoring.
 
@@ -10,11 +10,23 @@ An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.g
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
 - Docker stats via the unix socket with a hand-rolled client — no daemon polling cost, gracefully hidden when Docker is absent
 
+## Install
+
+Grab a prebuilt static binary from [Releases](https://github.com/OWNER/watchlite/releases) — no runtime, no package manager:
+
+```sh
+# Linux (x86_64 or aarch64)
+curl -fsSL "https://github.com/OWNER/watchlite/releases/latest/download/watchlite-$(uname -m)-unknown-linux-musl" \
+  -o /usr/local/bin/watchlite && chmod +x /usr/local/bin/watchlite
+```
+
+Or with cargo: `cargo install watchlite`. Or Docker: see [Dockerfile](Dockerfile).
+
 ## Usage
 
 ```sh
-atrasmon                                  # serves http://127.0.0.1:8077
-atrasmon --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic auth
+watchlite                                  # serves http://127.0.0.1:8077
+watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic auth
 ```
 
 | Flag | Default | Description |
@@ -28,7 +40,7 @@ atrasmon --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic au
 | `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
 | `--webhook <URL>` | | POST alert events as JSON (delivered via `curl`, so https works) |
 
-Env-var equivalents: `ATRASMON_BIND`, `ATRASMON_INTERVAL`, `ATRASMON_TOP`, `ATRASMON_AUTH`, `ATRASMON_HISTORY`, `ATRASMON_WEBHOOK` (flags win).
+Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `WATCHLITE_AUTH`, `WATCHLITE_HISTORY`, `WATCHLITE_WEBHOOK` (flags win).
 
 ## API
 
@@ -59,11 +71,11 @@ docker run --rm -v "$PWD":/app -w /app rust:alpine \
 
 ```ini
 [Unit]
-Description=atrasmon
+Description=watchlite
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/atrasmon --bind 0.0.0.0:8077 --auth admin:CHANGE_ME
+ExecStart=/usr/local/bin/watchlite --bind 0.0.0.0:8077 --auth admin:CHANGE_ME
 Restart=always
 DynamicUser=yes
 # Docker panel needs socket access; remove if unused:
