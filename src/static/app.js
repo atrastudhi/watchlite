@@ -1,7 +1,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const SPARK_LEN = 60;
+const SPARK_LEN = 180;
 
 let intervalMs = 2000;
 let timer = null;
@@ -70,6 +70,15 @@ function render(d) {
   $("host-info").textContent =
     `${d.host.hostname} · ${d.host.os} · ${d.host.kernel} · ${d.host.arch} · up ${fmtUptime(d.host.uptime_secs)}`;
 
+  // alerts banner
+  $("alerts").hidden = !d.alerts.length;
+  if (d.alerts.length) {
+    $("alerts").textContent = "⚠ " + d.alerts.map((a) => {
+      const since = new Date(a.since * 1000).toLocaleTimeString();
+      return `${a.metric} ${a.value}% > ${a.threshold}% (since ${since})`;
+    }).join("   ");
+  }
+
   // cpu
   const cpu = d.cpu.total_pct;
   $("cpu-total").textContent = cpu.toFixed(1) + "%";
@@ -125,6 +134,16 @@ function render(d) {
       ).join("");
   }
 
+  // connections (linux only)
+  $("panel-conns").hidden = !d.connections;
+  if (d.connections) {
+    $("conn-counts").textContent =
+      `${d.connections.established} established · ${d.connections.time_wait} time-wait`;
+    $("listen-ports").textContent = d.connections.listening.length
+      ? "listening: " + d.connections.listening.join(", ")
+      : "no listening ports";
+  }
+
   // sensors
   $("panel-sensors").hidden = !d.sensors;
   if (d.sensors) {
@@ -141,7 +160,8 @@ function render(d) {
   }
 
   // processes
-  $("proc-total").textContent = d.processes.total + " total";
+  $("proc-total").textContent = `${d.processes.total} total · ${d.processes.running} running` +
+    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : "");
   const list = procTab === "cpu" ? d.processes.top_cpu : d.processes.top_mem;
   $("proc-table").innerHTML =
     `<tr><th class="num">pid</th><th>name</th><th class="num">cpu% (1 core)</th><th class="num">mem</th></tr>` +
@@ -187,5 +207,21 @@ async function refresh() {
 $("tab-cpu").onclick = () => { procTab = "cpu"; $("tab-cpu").classList.add("active"); $("tab-mem").classList.remove("active"); refresh(); };
 $("tab-mem").onclick = () => { procTab = "mem"; $("tab-mem").classList.add("active"); $("tab-cpu").classList.remove("active"); refresh(); };
 
-refresh();
+// Seed sparklines from server-side history so charts survive page reloads.
+async function seedHistory() {
+  try {
+    const res = await fetch("/api/history");
+    const h = await res.json();
+    const pts = h.points || [];
+    const stride = Math.max(1, Math.ceil(pts.length / SPARK_LEN));
+    for (let i = 0; i < pts.length; i += stride) {
+      push(hist.cpu, pts[i].cpu);
+      push(hist.mem, pts[i].mem);
+      push(hist.rx, pts[i].rx);
+      push(hist.tx, pts[i].tx);
+    }
+  } catch { /* no history yet — sparklines fill in live */ }
+}
+
+seedHistory().then(refresh);
 timer = setInterval(refresh, intervalMs);

@@ -4,7 +4,10 @@ An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.g
 
 - **~500 KB static binary**, ~10 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
-- **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, top processes, Docker containers
+- **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, top processes with state counts, Docker containers
+- **History**: in-RAM ring buffer (1h default) — charts survive page reloads, served at `/api/history`
+- **Alerts**: `--alert cpu>90` style thresholds with hysteresis; events log to stderr and optionally POST to a webhook
+- **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
 - Docker stats via the unix socket with a hand-rolled client — no daemon polling cost, gracefully hidden when Docker is absent
 
 ## Usage
@@ -21,12 +24,23 @@ atrasmon --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic au
 | `--top <N>` | `10` | Top processes to report (1–100) |
 | `--no-docker` | | Disable the Docker collector |
 | `--auth <USER:PASS>` | | Require HTTP Basic auth |
+| `--history <SECS>` | `3600` | Sample history kept in RAM (60–86400) |
+| `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
+| `--webhook <URL>` | | POST alert events as JSON (delivered via `curl`, so https works) |
 
-Env-var equivalents: `ATRASMON_BIND`, `ATRASMON_INTERVAL`, `ATRASMON_TOP`, `ATRASMON_AUTH` (flags win).
+Env-var equivalents: `ATRASMON_BIND`, `ATRASMON_INTERVAL`, `ATRASMON_TOP`, `ATRASMON_AUTH`, `ATRASMON_HISTORY`, `ATRASMON_WEBHOOK` (flags win).
 
 ## API
 
-`GET /api/stats` returns the latest snapshot as JSON (one sample per interval; rates are bytes/sec computed server-side from counter deltas). `disk_io` is `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable; `sensors` is `null` when the host exposes none (typical for VMs). Fan speeds are Linux-only (`/sys/class/hwmon`).
+| Endpoint | Returns |
+|---|---|
+| `GET /api/stats` | Latest snapshot as JSON (one sample per interval; rates are bytes/sec from counter deltas) |
+| `GET /api/history` | Ring buffer of compact points: `{ts, cpu, mem, rx, tx}` |
+| `GET /metrics` | Prometheus text exposition format |
+
+`disk_io` and `connections` are `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable; `sensors` is `null` when the host exposes none (typical for VMs). Fan speeds are Linux-only (`/sys/class/hwmon`).
+
+Alerts fire after the threshold is exceeded for 3 consecutive samples and resolve the same way (no flapping). Webhook payload: `{"host", "metric", "value", "threshold", "state": "firing"|"resolved"}`.
 
 ## Build
 

@@ -1,6 +1,8 @@
-use crate::collectors::{disk, docker, net, process, sensors, system};
+use crate::alerts::AlertEngine;
+use crate::collectors::{connections, disk, docker, net, process, sensors, system};
 use crate::config::Config;
-use crate::state::{DiskIo, Net, SharedState, Snapshot};
+use crate::prom;
+use crate::state::{DiskIo, HistPoint, Net, SharedState, Snapshot};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use sysinfo::{
@@ -39,6 +41,8 @@ pub fn run(state: SharedState, config: Config) {
         docker_cpu: docker::PrevCpu::new(),
     };
 
+    let mut alert_engine = AlertEngine::new(&config);
+    let history_cap = (config.history.as_secs_f64() / config.interval.as_secs_f64()).ceil() as usize;
     let mut docker_was_up = false;
     let mut work = Duration::ZERO;
     loop {
@@ -99,7 +103,7 @@ pub fn run(state: SharedState, config: Config) {
             docker_was_up = docker_is_up;
         }
 
-        let snapshot = Snapshot {
+        let mut snapshot = Snapshot {
             ts: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
             interval_secs: config.interval.as_secs_f64(),
             host: system::host(&sys),
@@ -111,7 +115,10 @@ pub fn run(state: SharedState, config: Config) {
             processes: process::top(&sys, config.top_n),
             docker: docker_stats,
             sensors: sensors::read(&components),
+            connections: connections::read(),
+            alerts: Vec::new(),
         };
+        snapshot.alerts = alert_engine.eval(&snapshot);
 
         let docker_cpu = std::mem::take(&mut prev.docker_cpu);
         prev = Prev {
@@ -121,15 +128,39 @@ pub fn run(state: SharedState, config: Config) {
             docker_cpu,
         };
 
+        let point = HistPoint {
+            ts: snapshot.ts,
+            cpu: snapshot.cpu.total_pct,
+            mem: if snapshot.memory.total == 0 {
+                0.0
+            } else {
+                (snapshot.memory.used as f64 / snapshot.memory.total as f64 * 100.0) as f32
+            },
+            rx: snapshot.net.iter().map(|n| n.rx_bps).sum(),
+            tx: snapshot.net.iter().map(|n| n.tx_bps).sum(),
+        };
+
+        let prom_text = prom::render(&snapshot);
         if let Ok(json) = serde_json::to_string(&snapshot) {
-            match state.lock() {
-                Ok(mut s) => *s = json,
-                Err(poisoned) => *poisoned.into_inner() = json,
+            *lock_or_recover(&state.json) = json;
+        }
+        *lock_or_recover(&state.prom) = prom_text;
+        {
+            let mut hist = lock_or_recover(&state.history);
+            hist.push_back(point);
+            while hist.len() > history_cap {
+                hist.pop_front();
             }
         }
 
         work = tick_start.elapsed();
     }
+}
+
+/// A poisoned mutex here just means a panicked sampler tick mid-write;
+/// the data is a plain String/VecDeque, safe to keep using.
+fn lock_or_recover<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 fn to_map(v: Vec<(String, u64, u64)>) -> HashMap<String, (u64, u64)> {

@@ -1,16 +1,14 @@
+mod alerts;
 mod collectors;
 mod config;
 mod http;
+mod prom;
 mod sampler;
 mod state;
 
-use std::sync::{Arc, Mutex};
-
 fn main() {
     let config = config::Config::from_args();
-
-    // Placeholder until the first sample lands (~interval after startup).
-    let state: state::SharedState = Arc::new(Mutex::new("{\"warming_up\":true}".to_string()));
+    let state = state::Shared::new();
 
     let sampler_state = state.clone();
     let sampler_config = config.clone();

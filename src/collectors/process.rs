@@ -1,17 +1,29 @@
 use crate::state::{Proc, Processes};
-use sysinfo::System;
+use sysinfo::{ProcessStatus, System};
 
-/// Top-N processes by CPU and by memory. CPU% is percent of a single core
-/// (htop convention) — can exceed 100 for multi-threaded processes.
+/// Top-N processes by CPU and by memory, plus state counts. CPU% is percent
+/// of a single core (htop convention) — can exceed 100 for multi-threaded
+/// processes.
 pub fn top(sys: &System, n: usize) -> Processes {
+    let mut running = 0;
+    let mut sleeping = 0;
+    let mut zombie = 0;
     let mut procs: Vec<Proc> = sys
         .processes()
         .values()
-        .map(|p| Proc {
-            pid: p.pid().as_u32(),
-            name: p.name().to_string_lossy().into_owned(),
-            cpu_pct: p.cpu_usage(),
-            mem_bytes: p.memory(),
+        .map(|p| {
+            match p.status() {
+                ProcessStatus::Run => running += 1,
+                ProcessStatus::Sleep | ProcessStatus::Idle => sleeping += 1,
+                ProcessStatus::Zombie => zombie += 1,
+                _ => {}
+            }
+            Proc {
+                pid: p.pid().as_u32(),
+                name: p.name().to_string_lossy().into_owned(),
+                cpu_pct: p.cpu_usage(),
+                mem_bytes: p.memory(),
+            }
         })
         .collect();
     let total = procs.len();
@@ -22,5 +34,5 @@ pub fn top(sys: &System, n: usize) -> Processes {
     procs.sort_unstable_by(|a, b| b.mem_bytes.cmp(&a.mem_bytes));
     let top_mem: Vec<Proc> = procs.into_iter().take(n).collect();
 
-    Processes { total, top_cpu, top_mem }
+    Processes { total, running, sleeping, zombie, top_cpu, top_mem }
 }

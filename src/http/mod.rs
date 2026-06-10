@@ -42,9 +42,25 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
         "/app.js" => asset(assets::APP_JS, assets::CT_JS),
         "/style.css" => asset(assets::STYLE_CSS, assets::CT_CSS),
         "/api/stats" => {
-            let body = state.lock().map(|s| s.clone()).unwrap_or_else(|p| p.into_inner().clone());
+            let body = lock_or_recover(&state.json).clone();
             Response::from_string(body)
                 .with_header(header("Content-Type", assets::CT_JSON))
+                .with_header(header("Cache-Control", "no-store"))
+        }
+        "/api/history" => {
+            // Serialized on demand — only hit on page loads, not every tick.
+            let body = {
+                let hist = lock_or_recover(&state.history);
+                serde_json::to_string(&*hist).unwrap_or_else(|_| "[]".into())
+            };
+            Response::from_string(format!("{{\"points\":{body}}}"))
+                .with_header(header("Content-Type", assets::CT_JSON))
+                .with_header(header("Cache-Control", "no-store"))
+        }
+        "/metrics" => {
+            let body = lock_or_recover(&state.prom).clone();
+            Response::from_string(body)
+                .with_header(header("Content-Type", "text/plain; version=0.0.4; charset=utf-8"))
                 .with_header(header("Cache-Control", "no-store"))
         }
         _ => Response::from_string("404 Not Found").with_status_code(404),
@@ -54,6 +70,10 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
 
 fn asset(body: &'static str, content_type: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     Response::from_string(body).with_header(header("Content-Type", content_type))
+}
+
+fn lock_or_recover<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 fn header(field: &str, value: &str) -> Header {

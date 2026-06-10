@@ -13,6 +13,8 @@
   <div id="conn" class="conn-dot" title="connection status"></div>
 </header>
 
+<div id="alerts" class="alerts" hidden></div>
+
 <main>
   <section class="panel" id="panel-cpu">
     <h2>CPU <span id="cpu-total" class="metric"></span></h2>
@@ -43,6 +45,11 @@
   <section class="panel" id="panel-diskio" hidden>
     <h2>Disk I/O</h2>
     <table id="diskio-table"></table>
+  </section>
+
+  <section class="panel" id="panel-conns" hidden>
+    <h2>Connections <span id="conn-counts" class="metric"></span></h2>
+    <div id="listen-ports" class="subline"></div>
   </section>
 
   <section class="panel" id="panel-sensors" hidden>

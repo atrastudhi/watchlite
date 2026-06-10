@@ -1,9 +1,36 @@
 use serde::Serialize;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-/// The latest snapshot, pre-serialized to JSON once per sampling tick.
-/// HTTP handlers just clone the string — zero work on the request path.
-pub type SharedState = Arc<Mutex<String>>;
+/// Latest snapshot (JSON) and Prometheus text are pre-rendered once per
+/// sampling tick — HTTP handlers just clone strings. History is a compact
+/// ring buffer serialized on demand (page loads only).
+pub struct Shared {
+    pub json: Mutex<String>,
+    pub prom: Mutex<String>,
+    pub history: Mutex<VecDeque<HistPoint>>,
+}
+
+pub type SharedState = Arc<Shared>;
+
+impl Shared {
+    pub fn new() -> SharedState {
+        Arc::new(Shared {
+            json: Mutex::new("{\"warming_up\":true}".to_string()),
+            prom: Mutex::new(String::new()),
+            history: Mutex::new(VecDeque::new()),
+        })
+    }
+}
+
+#[derive(Serialize, Clone, Copy)]
+pub struct HistPoint {
+    pub ts: u64,
+    pub cpu: f32,
+    pub mem: f32,
+    pub rx: u64,
+    pub tx: u64,
+}
 
 #[derive(Serialize)]
 pub struct Snapshot {
@@ -18,6 +45,23 @@ pub struct Snapshot {
     pub processes: Processes,
     pub docker: Option<Docker>,
     pub sensors: Option<Sensors>,
+    pub connections: Option<Connections>,
+    pub alerts: Vec<AlertStatus>,
+}
+
+#[derive(Serialize)]
+pub struct Connections {
+    pub established: u32,
+    pub time_wait: u32,
+    pub listening: Vec<u16>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct AlertStatus {
+    pub metric: String,
+    pub value: f64,
+    pub threshold: f64,
+    pub since: u64,
 }
 
 #[derive(Serialize)]
@@ -93,6 +137,9 @@ pub struct Net {
 #[derive(Serialize)]
 pub struct Processes {
     pub total: usize,
+    pub running: usize,
+    pub sleeping: usize,
+    pub zombie: usize,
     pub top_cpu: Vec<Proc>,
     pub top_mem: Vec<Proc>,
 }

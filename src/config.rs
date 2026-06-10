@@ -11,6 +11,17 @@ pub struct Config {
     pub docker: bool,
     /// Precomputed `Basic <base64(user:pass)>` value, if auth is enabled.
     pub auth: Option<String>,
+    /// How much sample history to keep in RAM.
+    pub history: Duration,
+    pub alerts: Vec<AlertSpec>,
+    pub webhook: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct AlertSpec {
+    /// "cpu", "mem", or "disk" — all percentages.
+    pub metric: String,
+    pub threshold: f64,
 }
 
 const USAGE: &str = "\
@@ -26,10 +37,15 @@ OPTIONS:
     --top <N>           Number of top processes to report (default: 10)
     --no-docker         Disable the Docker collector
     --auth <USER:PASS>  Require HTTP Basic auth
+    --history <SECS>    Sample history kept in RAM (default: 3600)
+    --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
+                        metric one of cpu, mem, disk. Example: --alert cpu>90
+    --webhook <URL>     POST alert events as JSON (uses curl; needed for https)
     --help              Show this help
 
 ENVIRONMENT (flags take precedence):
-    ATRASMON_BIND, ATRASMON_INTERVAL, ATRASMON_TOP, ATRASMON_AUTH
+    ATRASMON_BIND, ATRASMON_INTERVAL, ATRASMON_TOP, ATRASMON_AUTH,
+    ATRASMON_HISTORY, ATRASMON_WEBHOOK
 ";
 
 fn fail(msg: &str) -> ! {
@@ -43,6 +59,9 @@ impl Config {
         let mut interval = env::var("ATRASMON_INTERVAL").unwrap_or_else(|_| "2".into());
         let mut top_n = env::var("ATRASMON_TOP").unwrap_or_else(|_| "10".into());
         let mut auth = env::var("ATRASMON_AUTH").ok();
+        let mut history = env::var("ATRASMON_HISTORY").unwrap_or_else(|_| "3600".into());
+        let mut webhook = env::var("ATRASMON_WEBHOOK").ok();
+        let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
 
         let mut args = env::args().skip(1);
@@ -56,6 +75,9 @@ impl Config {
                 "--interval" => interval = take("--interval"),
                 "--top" => top_n = take("--top"),
                 "--auth" => auth = Some(take("--auth")),
+                "--history" => history = take("--history"),
+                "--alert" => alert_specs.push(take("--alert")),
+                "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
                 "--help" | "-h" => {
                     print!("{USAGE}");
@@ -84,6 +106,28 @@ impl Config {
             }
             format!("Basic {}", base64_encode(creds.as_bytes()))
         });
+        let history: u64 = history
+            .parse()
+            .ok()
+            .filter(|h| *h >= 60 && *h <= 86400)
+            .unwrap_or_else(|| fail(&format!("invalid history seconds (60-86400): {history}")));
+        let alerts = alert_specs
+            .iter()
+            .map(|spec| {
+                let (metric, threshold) = spec
+                    .split_once('>')
+                    .unwrap_or_else(|| fail(&format!("invalid alert spec (want metric>percent): {spec}")));
+                if !["cpu", "mem", "disk"].contains(&metric) {
+                    fail(&format!("unknown alert metric (cpu, mem, disk): {metric}"));
+                }
+                let threshold: f64 = threshold
+                    .parse()
+                    .ok()
+                    .filter(|t| *t > 0.0 && *t < 100.0)
+                    .unwrap_or_else(|| fail(&format!("invalid alert threshold: {spec}")));
+                AlertSpec { metric: metric.to_string(), threshold }
+            })
+            .collect();
 
         Config {
             bind,
@@ -91,6 +135,9 @@ impl Config {
             top_n,
             docker,
             auth,
+            history: Duration::from_secs(history),
+            alerts,
+            webhook,
         }
     }
 }

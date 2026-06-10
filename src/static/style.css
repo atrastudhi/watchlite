@@ -39,6 +39,14 @@ header {
 .conn-dot.lost { background: var(--red); animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .3; } }
 
+.alerts {
+  background: rgba(248, 81, 73, .12);
+  border-bottom: 1px solid var(--red);
+  color: var(--red);
+  padding: 7px 16px;
+  font-size: 12px;
+}
+
 main {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
