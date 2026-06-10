@@ -1,8 +1,16 @@
 name: Release
 
+# Builds static binaries and attaches them to the GitHub release.
+# Triggered by release-please (workflow_call) or by manually pushing a v* tag.
+
 on:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag_name:
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -30,6 +38,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -66,6 +76,9 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag_name || github.ref_name }}
           files: |
             watchlite-*
-          generate_release_notes: true
+          # release-please writes the notes from the changelog; only generate
+          # notes for manually pushed tags
+          generate_release_notes: ${{ github.event_name == 'push' }}

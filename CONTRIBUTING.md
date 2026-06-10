@@ -26,6 +26,15 @@ The dashboard is vanilla HTML/CSS/JS in `src/static/`, embedded via `include_str
 
 Linux-only collectors (`/proc` parsers) keep their parsing logic in pure functions that take string input, so they're unit-testable on any OS — follow that pattern (see `collectors/connections.rs`).
 
+## Commit messages
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please): version bumps and the changelog are derived from [Conventional Commits](https://www.conventionalcommits.org/). Prefix your commits accordingly:
+
+- `fix: ...` → patch release, listed under Bug Fixes
+- `feat: ...` → minor release, listed under Features
+- `feat!: ...` or a `BREAKING CHANGE:` footer → major release
+- `docs:`, `ci:`, `chore:`, `refactor:`, `test:` → no release, not in the changelog
+
 ## Pull requests
 
 - One logical change per PR.
