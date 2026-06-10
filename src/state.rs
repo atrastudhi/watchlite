@@ -92,6 +92,10 @@ pub struct Host {
     pub arch: String,
     pub uptime_secs: u64,
     pub cpu_count: usize,
+    /// CPU brand string, e.g. "Apple M3 Pro" or "Intel(R) Xeon(R) ...".
+    pub cpu_model: String,
+    /// Current/nominal frequency in MHz; 0 when the platform doesn't report it.
+    pub cpu_freq_mhz: u64,
 }
 
 #[derive(Serialize)]

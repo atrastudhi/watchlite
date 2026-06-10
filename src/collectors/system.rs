@@ -2,6 +2,7 @@ use crate::state::{Cpu, Host, Memory};
 use sysinfo::System;
 
 pub fn host(sys: &System) -> Host {
+    let cpu0 = sys.cpus().first();
     Host {
         hostname: System::host_name().unwrap_or_else(|| "unknown".into()),
         os: System::long_os_version()
@@ -10,6 +11,11 @@ pub fn host(sys: &System) -> Host {
         arch: System::cpu_arch(),
         uptime_secs: System::uptime(),
         cpu_count: sys.cpus().len(),
+        cpu_model: cpu0
+            .map(|c| c.brand().trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "unknown".into()),
+        cpu_freq_mhz: cpu0.map(|c| c.frequency()).unwrap_or(0),
     }
 }
 

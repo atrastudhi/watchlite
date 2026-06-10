@@ -164,6 +164,8 @@ mod tests {
                 arch: "test".into(),
                 uptime_secs: 1,
                 cpu_count: 1,
+                cpu_model: "test".into(),
+                cpu_freq_mhz: 0,
             },
             cpu: Cpu {
                 total_pct: cpu_pct,

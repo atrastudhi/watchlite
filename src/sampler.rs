@@ -21,7 +21,7 @@ struct Prev {
 
 pub fn run(state: SharedState, config: Config) {
     let refresh = RefreshKind::nothing()
-        .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
+        .with_cpu(CpuRefreshKind::nothing().with_cpu_usage().with_frequency())
         .with_memory(MemoryRefreshKind::everything());
     let proc_refresh = ProcessRefreshKind::nothing().with_cpu().with_memory();
 

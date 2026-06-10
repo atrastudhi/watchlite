@@ -132,6 +132,10 @@ function render(d) {
     `<div class="bar"><div class="bar-fill ${pctClass(p)}" style="width:${Math.min(100, p)}%"></div></div>` +
     `<span class="core-pct">${p.toFixed(0)}%</span></div>`
   ).join("");
+  $("cpu-model").textContent = d.host.cpu_model +
+    ` · ${d.host.cpu_count} cores` +
+    (d.host.cpu_freq_mhz ? ` · ${(d.host.cpu_freq_mhz / 1000).toFixed(1)} GHz` : "") +
+    ` · ${d.host.arch}`;
 
   // memory
   const memPct = d.memory.total ? (d.memory.used / d.memory.total) * 100 : 0;
