@@ -26,7 +26,15 @@ curl -fsSL "https://github.com/atrastudhi/watchlite/releases/latest/download/wat
   -o /usr/local/bin/watchlite && chmod +x /usr/local/bin/watchlite
 ```
 
-Or with cargo: `cargo install watchlite`. Or Docker: see [Dockerfile](Dockerfile).
+Or with cargo: `cargo install watchlite`. Or Docker (multi-arch, <1 MB image):
+
+```sh
+docker run -d --name watchlite --pid=host --net=host \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  ghcr.io/atrastudhi/watchlite:latest
+```
+
+`--pid=host --net=host` lets it report the host's processes and interfaces rather than the container's; drop them (and add `-p 8077:8077`) if you only want a demo. With `--net=host` it binds `0.0.0.0:8077` by default — add `--auth user:pass` or bind to localhost behind a proxy.
 
 ## Usage
 

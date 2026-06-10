@@ -193,6 +193,53 @@ jobs:
           files: |
             watchlite-*
 
+  docker:
+    needs: [version, build]
+    if: needs.version.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      # wrap the already-built static musl binaries — image binary is
+      # bit-identical to the release binary, no rebuild
+      - name: Stage build context
+        run: |
+          mkdir docker-ctx
+          cp watchlite-x86_64-unknown-linux-musl docker-ctx/watchlite-amd64
+          cp watchlite-aarch64-unknown-linux-musl docker-ctx/watchlite-arm64
+          chmod +x docker-ctx/watchlite-*
+          cat > docker-ctx/Dockerfile <<'EOF'
+          FROM scratch
+          ARG TARGETARCH
+          LABEL org.opencontainers.image.source=https://github.com/atrastudhi/watchlite
+          LABEL org.opencontainers.image.description="Ultra-lightweight single-binary server monitor"
+          LABEL org.opencontainers.image.licenses=MIT
+          COPY watchlite-${TARGETARCH} /watchlite
+          EXPOSE 8077
+          ENTRYPOINT ["/watchlite"]
+          CMD ["--bind", "0.0.0.0:8077"]
+          EOF
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push multi-arch image
+        run: |
+          ver="${TAG#v}"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag "ghcr.io/${{ github.repository }}:latest" \
+            --tag "ghcr.io/${{ github.repository }}:$ver" \
+            --push docker-ctx
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+
   publish:
     needs: [version, release]
     if: needs.version.outputs.tag != ''
