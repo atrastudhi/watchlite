@@ -73,8 +73,10 @@ function drawChart(canvas, series, max) {
 
   const peak = max || Math.max(1, ...series.map((s) => Math.max(...s.data)));
   const P = 3;
+  // scale x to the points we have, so a still-filling buffer spans the
+  // full width instead of huddling at the left edge
   const xy = (buf, i) => [
-    (i / (SPARK_LEN - 1)) * w,
+    (i / (Math.max(buf.length, 2) - 1)) * w,
     h - P - (Math.min(buf[i], peak) / peak) * (h - 2 * P)
   ];
 
