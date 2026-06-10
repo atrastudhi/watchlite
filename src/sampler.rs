@@ -120,7 +120,7 @@ pub fn run(state: SharedState, config: Config) {
             disks: disk::usage(&disks),
             disk_io,
             net: net_rates,
-            processes: process::top(&sys, config.top_n),
+            processes: process::list(&sys, config.top_n),
             docker: docker_stats,
             sensors: sensors::read(&components),
             connections: connections::read(),

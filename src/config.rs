@@ -34,7 +34,7 @@ OPTIONS:
     --bind <ADDR>       Address to listen on (default: 127.0.0.1:8077)
                         Use 0.0.0.0:8077 to allow remote access.
     --interval <SECS>   Sampling interval in seconds (default: 2)
-    --top <N>           Number of top processes to report (default: 10)
+    --top <N>           Cap the process list sent to the UI (0 = all, default)
     --no-docker         Disable the Docker collector
     --auth <USER:PASS>  Require HTTP Basic auth
     --history <SECS>    Sample history kept in RAM (default: 3600)
@@ -58,7 +58,7 @@ impl Config {
     pub fn from_args() -> Config {
         let mut bind = env::var("WATCHLITE_BIND").unwrap_or_else(|_| "127.0.0.1:8077".into());
         let mut interval = env::var("WATCHLITE_INTERVAL").unwrap_or_else(|_| "2".into());
-        let mut top_n = env::var("WATCHLITE_TOP").unwrap_or_else(|_| "10".into());
+        let mut top_n = env::var("WATCHLITE_TOP").unwrap_or_else(|_| "0".into());
         let mut auth = env::var("WATCHLITE_AUTH").ok();
         let mut history = env::var("WATCHLITE_HISTORY").unwrap_or_else(|_| "3600".into());
         let mut webhook = env::var("WATCHLITE_WEBHOOK").ok();
@@ -103,8 +103,8 @@ impl Config {
         let top_n: usize = top_n
             .parse()
             .ok()
-            .filter(|n| *n >= 1 && *n <= 100)
-            .unwrap_or_else(|| fail(&format!("invalid top count (1-100): {top_n}")));
+            .filter(|n| *n <= 10000)
+            .unwrap_or_else(|| fail(&format!("invalid top count (0-10000, 0=all): {top_n}")));
         let auth = auth.map(|creds| {
             if !creds.contains(':') {
                 fail("--auth must be in USER:PASS form");

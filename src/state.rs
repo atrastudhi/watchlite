@@ -140,16 +140,16 @@ pub struct Processes {
     pub running: usize,
     pub sleeping: usize,
     pub zombie: usize,
-    pub top_cpu: Vec<Proc>,
-    pub top_mem: Vec<Proc>,
+    /// All processes sorted by CPU descending (capped by --top if set).
+    pub list: Vec<Proc>,
 }
 
 #[derive(Serialize, Clone)]
 pub struct Proc {
     pub pid: u32,
     pub name: String,
-    /// Single-letter state: R(un), S(leep), I(dle), Z(ombie), T(stopped), ?.
-    pub state: char,
+    /// Full state word: running, sleeping, idle, zombie, stopped, unknown.
+    pub state: &'static str,
     pub cpu_pct: f32,
     pub mem_bytes: u64,
 }

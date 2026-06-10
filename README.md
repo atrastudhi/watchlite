@@ -35,7 +35,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 |---|---|---|
 | `--bind <ADDR>` | `127.0.0.1:8077` | Listen address (`0.0.0.0:...` for remote access) |
 | `--interval <SECS>` | `2` | Sampling interval (0.5–3600) |
-| `--top <N>` | `10` | Top processes to report (1–100) |
+| `--top <N>` | `0` (all) | Cap the process list sent to the UI (0–10000) |
 | `--no-docker` | | Disable the Docker collector |
 | `--auth <USER:PASS>` | | Require HTTP Basic auth |
 | `--history <SECS>` | `3600` | Sample history kept in RAM (60–86400) |

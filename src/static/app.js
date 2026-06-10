@@ -217,12 +217,10 @@ function render(d) {
       : "";
   }
 
-  // processes — merge top lists, sort client-side
+  // processes — full list from server, sorted client-side
   $("proc-total").textContent = `${d.processes.total} total · ${d.processes.running} running` +
     (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : " · 0 zombie");
-  const byPid = new Map();
-  for (const p of [...d.processes.top_cpu, ...d.processes.top_mem]) byPid.set(p.pid, p);
-  const procs = [...byPid.values()].sort((a, b) => {
+  const procs = [...d.processes.list].sort((a, b) => {
     const va = sortKey === "cpu" ? a.cpu_pct : sortKey === "mem" ? a.mem_bytes : a[sortKey];
     const vb = sortKey === "cpu" ? b.cpu_pct : sortKey === "mem" ? b.mem_bytes : b[sortKey];
     return (sortKey === "name" ? String(va).localeCompare(String(vb)) : va - vb) * sortDir;
@@ -232,7 +230,7 @@ function render(d) {
   }
   $("proc-rows").innerHTML = procs.map((p) =>
     `<div class="gt-row"><span class="num dim">${p.pid}</span><span>${esc(p.name)}</span>` +
-    `<span class="${p.state === "R" ? "st-r" : p.state === "Z" ? "st-z" : "dim"}">${esc(p.state || "?")}</span>` +
+    `<span class="${p.state === "running" ? "st-r" : p.state === "zombie" ? "st-z" : "dim"}">${esc(p.state)}</span>` +
     `<div class="cpu-cell"><div class="bar"><div class="bar-fill ${pctClass(p.cpu_pct)}" style="width:${Math.min(100, p.cpu_pct)}%"></div></div>` +
     `<span class="cpu-num">${p.cpu_pct.toFixed(1)}</span></div>` +
     `<span class="num">${fmtBytes(p.mem_bytes)}</span></div>`
