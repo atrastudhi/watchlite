@@ -199,12 +199,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # crates.io Trusted Publishing: OIDC mints a ~30min token per run,
+      # so no long-lived registry token is stored anywhere
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.version.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - run: cargo publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
