@@ -1,0 +1,19 @@
+[package]
+name = "atrasmon"
+version = "0.1.0"
+edition = "2021"
+description = "Ultra-lightweight single-binary server monitor with embedded web dashboard"
+license = "MIT"
+
+[dependencies]
+tiny_http = "0.12"
+sysinfo = { version = "0.39", default-features = false, features = ["system", "disk", "network"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

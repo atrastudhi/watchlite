@@ -1,0 +1,101 @@
+use serde::Serialize;
+use std::sync::{Arc, Mutex};
+
+/// The latest snapshot, pre-serialized to JSON once per sampling tick.
+/// HTTP handlers just clone the string — zero work on the request path.
+pub type SharedState = Arc<Mutex<String>>;
+
+#[derive(Serialize)]
+pub struct Snapshot {
+    pub ts: u64,
+    pub interval_secs: f64,
+    pub host: Host,
+    pub cpu: Cpu,
+    pub memory: Memory,
+    pub disks: Vec<Disk>,
+    pub disk_io: Option<Vec<DiskIo>>,
+    pub net: Vec<Net>,
+    pub processes: Processes,
+    pub docker: Option<Docker>,
+}
+
+#[derive(Serialize)]
+pub struct Host {
+    pub hostname: String,
+    pub os: String,
+    pub kernel: String,
+    pub arch: String,
+    pub uptime_secs: u64,
+    pub cpu_count: usize,
+}
+
+#[derive(Serialize)]
+pub struct Cpu {
+    pub total_pct: f32,
+    pub per_core_pct: Vec<f32>,
+    pub load_avg: [f64; 3],
+}
+
+#[derive(Serialize)]
+pub struct Memory {
+    pub total: u64,
+    pub used: u64,
+    pub available: u64,
+    pub swap_total: u64,
+    pub swap_used: u64,
+}
+
+#[derive(Serialize)]
+pub struct Disk {
+    pub mount: String,
+    pub fs: String,
+    pub total: u64,
+    pub used: u64,
+}
+
+#[derive(Serialize)]
+pub struct DiskIo {
+    pub device: String,
+    pub read_bps: u64,
+    pub write_bps: u64,
+}
+
+#[derive(Serialize)]
+pub struct Net {
+    pub iface: String,
+    pub rx_bps: u64,
+    pub tx_bps: u64,
+    pub rx_total: u64,
+    pub tx_total: u64,
+}
+
+#[derive(Serialize)]
+pub struct Processes {
+    pub total: usize,
+    pub top_cpu: Vec<Proc>,
+    pub top_mem: Vec<Proc>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Proc {
+    pub pid: u32,
+    pub name: String,
+    pub cpu_pct: f32,
+    pub mem_bytes: u64,
+}
+
+#[derive(Serialize)]
+pub struct Docker {
+    pub containers: Vec<Container>,
+}
+
+#[derive(Serialize)]
+pub struct Container {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub state: String,
+    pub cpu_pct: f64,
+    pub mem_bytes: u64,
+    pub mem_limit: u64,
+}
