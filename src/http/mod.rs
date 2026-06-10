@@ -30,6 +30,13 @@ pub fn serve(config: &Config, state: SharedState) -> ! {
 }
 
 fn handle(request: Request, config: &Config, state: &SharedState) {
+    // liveness probe: no auth, reveals nothing but "the process serves HTTP"
+    if request.url().split('?').next() == Some("/healthz") {
+        let resp = Response::from_string("ok").with_header(header("Cache-Control", "no-store"));
+        let _ = request.respond(resp);
+        return;
+    }
+
     if let Some(expected) = &config.auth {
         let ok = request
             .headers()

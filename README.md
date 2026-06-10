@@ -55,6 +55,7 @@ Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `W
 | `GET /api/stats` | Latest snapshot as JSON (one sample per interval; rates are bytes/sec from counter deltas) |
 | `GET /api/history` | Ring buffer of compact points: `{ts, cpu, mem, rx, tx}` |
 | `GET /metrics` | Prometheus text exposition format |
+| `GET /healthz` | Liveness probe: `200 ok` (never requires auth) |
 
 `disk_io` and `connections` are `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable; `sensors` is `null` when the host exposes none (typical for VMs). Fan speeds are Linux-only (`/sys/class/hwmon`).
 
