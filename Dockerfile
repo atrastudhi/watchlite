@@ -2,7 +2,7 @@
 #
 # For real host metrics the container must see the host's namespaces:
 #   docker run -d --name watchlite \
-#     --pid=host --net=host \
+#     --pid=host --net=host --uts=host \
 #     -v /var/run/docker.sock:/var/run/docker.sock:ro \
 #     ghcr.io/atrastudhi/watchlite --bind 0.0.0.0:8077
 #

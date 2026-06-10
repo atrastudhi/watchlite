@@ -29,12 +29,14 @@ curl -fsSL "https://github.com/atrastudhi/watchlite/releases/latest/download/wat
 Or with cargo: `cargo install watchlite`. Or Docker (multi-arch, <1 MB image):
 
 ```sh
-docker run -d --name watchlite --pid=host --net=host \
+docker run -d --name watchlite --pid=host --net=host --uts=host \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   ghcr.io/atrastudhi/watchlite:latest
 ```
 
-`--pid=host --net=host` lets it report the host's processes and interfaces rather than the container's; drop them (and add `-p 8077:8077`) if you only want a demo. With `--net=host` it binds `0.0.0.0:8077` by default — add `--auth user:pass` or bind to localhost behind a proxy.
+The host namespaces are what let it report the host's processes, interfaces, connections, and hostname instead of the container's (the same flags Glances and netdata require); drop them (and add `-p 8077:8077`) if you only want a demo. With `--net=host` it binds `0.0.0.0:8077` by default — add `--auth user:pass` or bind to localhost behind a proxy.
+
+The native binary needs none of this — it's static, smaller than the image, and sees everything by default. Prefer it unless your infra is containers-only.
 
 ## Usage
 
