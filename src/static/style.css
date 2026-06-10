@@ -92,8 +92,8 @@ main {
 .row { display: flex; gap: 8px; flex: none; }
 .row.grow { flex: 1; min-height: 120px; }
 .row > .panel { flex: 1; min-width: 0; }
-.row > .panel.wide7 { flex: 7; }
-.row > .panel.wide5 { flex: 5; }
+.row > .panel.wide7 { flex: 1; }
+.row > .panel.wide5 { flex: 1; }
 
 .panel {
   background: var(--panel);
