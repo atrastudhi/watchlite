@@ -4,7 +4,7 @@
 #   docker run -d --name watchlite \
 #     --pid=host --net=host \
 #     -v /var/run/docker.sock:/var/run/docker.sock:ro \
-#     ghcr.io/OWNER/watchlite --bind 0.0.0.0:8077
+#     ghcr.io/atrastudhi/watchlite --bind 0.0.0.0:8077
 #
 # Without --pid/--net=host it reports the container's own view (fine for a demo).
 

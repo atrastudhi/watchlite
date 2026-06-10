@@ -14,11 +14,11 @@ An ultra-lightweight, single-binary server monitor with an embedded web dashboar
 
 ## Install
 
-Grab a prebuilt static binary from [Releases](https://github.com/OWNER/watchlite/releases) — no runtime, no package manager:
+Grab a prebuilt static binary from [Releases](https://github.com/atrastudhi/watchlite/releases) — no runtime, no package manager:
 
 ```sh
 # Linux (x86_64 or aarch64)
-curl -fsSL "https://github.com/OWNER/watchlite/releases/latest/download/watchlite-$(uname -m)-unknown-linux-musl" \
+curl -fsSL "https://github.com/atrastudhi/watchlite/releases/latest/download/watchlite-$(uname -m)-unknown-linux-musl" \
   -o /usr/local/bin/watchlite && chmod +x /usr/local/bin/watchlite
 ```
 
