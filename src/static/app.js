@@ -229,7 +229,7 @@ function render(d) {
     $("arr-" + k).textContent = sortKey === k ? (sortDir > 0 ? " ▴" : " ▾") : "";
   }
   $("proc-rows").innerHTML = procs.map((p) =>
-    `<div class="gt-row"><span class="num dim">${p.pid}</span><span>${esc(p.name)}</span>` +
+    `<div class="gt-row"><span class="num dim">${p.pid}</span><span title="${esc(p.name)}">${esc(p.name)}</span>` +
     `<span class="${p.state === "running" ? "st-r" : p.state === "zombie" ? "st-z" : "dim"}">${esc(p.state)}</span>` +
     `<div class="cpu-cell"><div class="bar"><div class="bar-fill ${pctClass(p.cpu_pct)}" style="width:${Math.min(100, p.cpu_pct)}%"></div></div>` +
     `<span class="cpu-num">${p.cpu_pct.toFixed(1)}</span></div>` +
@@ -242,7 +242,8 @@ function render(d) {
     const running = d.docker.containers.filter((c) => c.state === "running").length;
     $("docker-total").textContent = `${d.docker.containers.length} containers · ${running} running`;
     $("docker-rows").innerHTML = d.docker.containers.map((c) =>
-      `<div class="gt-row"><span>${esc(c.name)}</span><span class="dim">${esc(c.image)}</span>` +
+      `<div class="gt-row"><span title="${esc(c.name)}">${esc(c.name)}</span>` +
+      `<span class="dim" title="${esc(c.image)}">${esc(c.image)}</span>` +
       `<span class="state-${esc(c.state)}">${esc(c.state)}</span>` +
       `<span class="num">${c.state === "running" ? c.cpu_pct.toFixed(1) : "-"}</span>` +
       `<span class="num dim">${c.state === "running" ? fmtBytes(c.mem_bytes) + " / " + fmtBytes(c.mem_limit) : "-"}</span></div>`
