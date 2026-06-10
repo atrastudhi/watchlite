@@ -1,5 +1,9 @@
 # watchlite
 
+[![CI](https://github.com/atrastudhi/watchlite/actions/workflows/ci.yml/badge.svg)](https://github.com/atrastudhi/watchlite/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/atrastudhi/watchlite)](https://github.com/atrastudhi/watchlite/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/atrastudhi/watchlite)](LICENSE)
+
 An ultra-lightweight, single-binary server monitor with an embedded web dashboard — everything you need to glance at a box's health, in a binary smaller than a favicon.
 
 ![watchlite dashboard](assets/dashboard.gif)
