@@ -200,19 +200,23 @@ function render(d) {
       : `<span class="subline">none</span>`;
   }
 
-  // sensors
+  // sensors — cap rows so sensor-heavy hosts keep the one-screen layout
   $("panel-sensors").hidden = !d.sensors;
   if (d.sensors) {
-    $("temps").innerHTML = d.sensors.temps.map((t) => {
+    const MAX_TEMPS = 8;
+    const shown = d.sensors.temps.slice(0, MAX_TEMPS);
+    const extra = d.sensors.temps.length - shown.length;
+    $("temps").innerHTML = shown.map((t) => {
       const crit = t.critical_c || 100;
       const pct = Math.min(100, (t.temp_c / crit) * 100);
       return `<div class="sensor-row"><span class="s-label">${esc(t.label)}</span>` +
         `<div class="bar"><div class="bar-fill ${pctClass(pct)}" style="width:${pct}%"></div></div>` +
         `<span class="s-val">${t.temp_c.toFixed(1)}°${t.critical_c ? " / " + t.critical_c.toFixed(0) + "°C" : ""}</span></div>`;
     }).join("");
-    $("fans").textContent = d.sensors.fans.length
-      ? d.sensors.fans.map((f) => `${f.label} ${f.rpm} rpm`).join(" · ")
-      : "";
+    $("fans").textContent = [
+      ...d.sensors.fans.map((f) => `${f.label} ${f.rpm} rpm`),
+      ...(extra > 0 ? [`+${extra} more`] : [])
+    ].join(" · ");
   }
 
   // processes — merge top lists, sort client-side
