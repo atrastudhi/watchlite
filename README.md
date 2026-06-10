@@ -1,6 +1,6 @@
 # watchlite
 
-An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.github.io/glances/) for server monitoring.
+An ultra-lightweight, single-binary server monitor with an embedded web dashboard — everything you need to glance at a box's health, in a binary smaller than a favicon.
 
 ![watchlite dashboard](readme.gif)
 
