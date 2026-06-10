@@ -4,7 +4,7 @@ An ultra-lightweight, single-binary alternative to [Glances](https://nicolargo.g
 
 - **~500 KB static binary**, ~10 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
-- **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, top processes, Docker containers
+- **Metrics**: CPU (total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, top processes, Docker containers
 - Docker stats via the unix socket with a hand-rolled client — no daemon polling cost, gracefully hidden when Docker is absent
 
 ## Usage
@@ -26,7 +26,7 @@ Env-var equivalents: `ATRASMON_BIND`, `ATRASMON_INTERVAL`, `ATRASMON_TOP`, `ATRA
 
 ## API
 
-`GET /api/stats` returns the latest snapshot as JSON (one sample per interval; rates are bytes/sec computed server-side from counter deltas). `disk_io` is `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable.
+`GET /api/stats` returns the latest snapshot as JSON (one sample per interval; rates are bytes/sec computed server-side from counter deltas). `disk_io` is `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable; `sensors` is `null` when the host exposes none (typical for VMs). Fan speeds are Linux-only (`/sys/class/hwmon`).
 
 ## Build
 

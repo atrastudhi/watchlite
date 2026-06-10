@@ -125,6 +125,21 @@ function render(d) {
       ).join("");
   }
 
+  // sensors
+  $("panel-sensors").hidden = !d.sensors;
+  if (d.sensors) {
+    $("temps").innerHTML = d.sensors.temps.map((t) => {
+      const crit = t.critical_c || 100;
+      const pct = Math.min(100, (t.temp_c / crit) * 100);
+      return `<div class="disk-row"><div class="label"><span><b>${esc(t.label)}</b></span>` +
+        `<span>${t.temp_c.toFixed(1)}°C${t.critical_c ? " / " + t.critical_c.toFixed(0) + "°C" : ""}</span></div>` +
+        `<div class="gauge small"><div class="gauge-fill ${pctClass(pct)}" style="width:${pct}%"></div></div></div>`;
+    }).join("");
+    $("fans").textContent = d.sensors.fans.length
+      ? d.sensors.fans.map((f) => `${f.label}: ${f.rpm} rpm`).join(" · ")
+      : "";
+  }
+
   // processes
   $("proc-total").textContent = d.processes.total + " total";
   const list = procTab === "cpu" ? d.processes.top_cpu : d.processes.top_mem;

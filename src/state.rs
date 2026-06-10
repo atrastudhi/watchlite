@@ -17,6 +17,27 @@ pub struct Snapshot {
     pub net: Vec<Net>,
     pub processes: Processes,
     pub docker: Option<Docker>,
+    pub sensors: Option<Sensors>,
+}
+
+#[derive(Serialize)]
+pub struct Sensors {
+    pub temps: Vec<Temp>,
+    pub fans: Vec<Fan>,
+}
+
+#[derive(Serialize)]
+pub struct Temp {
+    pub label: String,
+    pub temp_c: f32,
+    /// Critical threshold if the sensor reports one.
+    pub critical_c: Option<f32>,
+}
+
+#[derive(Serialize)]
+pub struct Fan {
+    pub label: String,
+    pub rpm: u64,
 }
 
 #[derive(Serialize)]

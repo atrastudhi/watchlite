@@ -1,11 +1,11 @@
-use crate::collectors::{disk, docker, net, process, system};
+use crate::collectors::{disk, docker, net, process, sensors, system};
 use crate::config::Config;
 use crate::state::{DiskIo, Net, SharedState, Snapshot};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use sysinfo::{
-    CpuRefreshKind, Disks, MemoryRefreshKind, Networks, ProcessRefreshKind, ProcessesToUpdate,
-    RefreshKind, System,
+    Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, ProcessRefreshKind,
+    ProcessesToUpdate, RefreshKind, System,
 };
 
 /// Previous-tick cumulative counters. Rebuilt from current keys each tick so
@@ -26,6 +26,7 @@ pub fn run(state: SharedState, config: Config) {
     let mut sys = System::new_with_specifics(refresh);
     let mut networks = Networks::new_with_refreshed_list();
     let mut disks = Disks::new_with_refreshed_list();
+    let mut components = Components::new_with_refreshed_list();
 
     // CPU% needs two refreshes spaced apart; warm up so the first
     // snapshot already has real numbers.
@@ -49,6 +50,7 @@ pub fn run(state: SharedState, config: Config) {
         sys.refresh_processes_specifics(ProcessesToUpdate::All, true, proc_refresh);
         networks.refresh(true);
         disks.refresh(true);
+        components.refresh(true);
 
         let elapsed = prev.at.elapsed().as_secs_f64();
         let sampled_at = Instant::now();
@@ -108,6 +110,7 @@ pub fn run(state: SharedState, config: Config) {
             net: net_rates,
             processes: process::top(&sys, config.top_n),
             docker: docker_stats,
+            sensors: sensors::read(&components),
         };
 
         let docker_cpu = std::mem::take(&mut prev.docker_cpu);
