@@ -1,15 +1,27 @@
 name: CI
 
+# One pipeline: check + test, then on master pushes decide from conventional
+# commits whether to release; if so bump version/changelog, tag, build all
+# targets, and publish the GitHub release.
+#
+# No retrigger loop: the bump commit and tag are pushed with the Actions
+# token, and token-created events never start workflows.
+
 on:
   push:
-    branches: [master, main]
+    branches: [master]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   check:
+    permissions:
+      contents: read
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -23,6 +35,160 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
-      - run: cargo build --release
-      - name: Report binary size
-        run: ls -lh target/release/watchlite
+
+  # Decide the bump from commit subjects since the last tag:
+  #   feat!/BREAKING CHANGE -> major, feat -> minor, fix/perf -> patch,
+  #   anything else -> no release (job succeeds with empty tag output).
+  version:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: bump
+        run: |
+          set -euo pipefail
+          last=$(git describe --tags --abbrev=0 --match 'v*')
+          subjects=$(git log "$last"..HEAD --format=%s)
+          echo "commits since $last:"; echo "$subjects" | sed 's/^/  /'
+
+          bump=""
+          if grep -qE '^(feat|fix|perf|refactor)(\([^)]*\))?!:' <<<"$subjects"; then bump=major
+          elif git log "$last"..HEAD --format=%B | grep -q 'BREAKING CHANGE'; then bump=major
+          elif grep -qE '^feat(\([^)]*\))?:' <<<"$subjects"; then bump=minor
+          elif grep -qE '^(fix|perf)(\([^)]*\))?:' <<<"$subjects"; then bump=patch
+          fi
+          if [ -z "$bump" ]; then
+            echo "no releasable commits — done"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ver=${last#v}
+          IFS=. read -r MA MI PA <<<"$ver"
+          case "$bump" in
+            major) MA=$((MA+1)); MI=0; PA=0 ;;
+            minor) MI=$((MI+1)); PA=0 ;;
+            patch) PA=$((PA+1)) ;;
+          esac
+          new="$MA.$MI.$PA"
+          echo "bump: $bump -> v$new"
+
+          # Cargo.toml + Cargo.lock
+          sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"$new\"/" Cargo.toml
+          awk -v ver="$new" '
+            prev == "name = \"watchlite\"" && /^version = / { sub(/"[^"]+"/, "\"" ver "\"") }
+            { prev = $0; print }' Cargo.lock > Cargo.lock.new && mv Cargo.lock.new Cargo.lock
+
+          # changelog section (also used as the release notes)
+          {
+            echo "## [$new](https://github.com/$GITHUB_REPOSITORY/compare/$last...v$new) ($(date -u +%F))"
+            echo
+            feats=$(git log "$last"..HEAD --format='%s|%h' | grep -E '^feat(\([^)]*\))?!?:' || true)
+            if [ -n "$feats" ]; then
+              echo "### Features"; echo
+              while IFS='|' read -r s h; do echo "* ${s#*: } ($h)"; done <<<"$feats"
+              echo
+            fi
+            fixes=$(git log "$last"..HEAD --format='%s|%h' | grep -E '^(fix|perf)(\([^)]*\))?!?:' || true)
+            if [ -n "$fixes" ]; then
+              echo "### Bug Fixes"; echo
+              while IFS='|' read -r s h; do echo "* ${s#*: } ($h)"; done <<<"$fixes"
+              echo
+            fi
+          } > release-notes.md
+          python3 - <<'PY'
+          sec = open('release-notes.md').read()
+          c = open('CHANGELOG.md').read()
+          i = c.find('\n## [')
+          i = i + 1 if i >= 0 else len(c)
+          open('CHANGELOG.md', 'w').write(c[:i] + sec + '\n' + c[i:])
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock CHANGELOG.md
+          git commit -m "chore: release v$new"
+          git tag -a "v$new" -m "watchlite v$new"
+          git push origin HEAD:master "refs/tags/v$new"
+          echo "tag=v$new" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: steps.bump.outputs.tag != ''
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  build:
+    needs: version
+    if: needs.version.outputs.tag != ''
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --locked
+      - name: Build
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+      - name: Package
+        run: |
+          cp "target/${{ matrix.target }}/release/watchlite" "watchlite-${{ matrix.target }}"
+          shasum -a 256 "watchlite-${{ matrix.target }}" > "watchlite-${{ matrix.target }}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: watchlite-${{ matrix.target }}
+          path: |
+            watchlite-${{ matrix.target }}
+            watchlite-${{ matrix.target }}.sha256
+
+  release:
+    needs: [version, build]
+    if: needs.version.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          body_path: release-notes.md
+          files: |
+            watchlite-*

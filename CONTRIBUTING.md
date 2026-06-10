@@ -28,7 +28,7 @@ Linux-only collectors (`/proc` parsers) keep their parsing logic in pure functio
 
 ## Commit messages
 
-Releases are automated with [release-please](https://github.com/googleapis/release-please): version bumps and the changelog are derived from [Conventional Commits](https://www.conventionalcommits.org/). Prefix your commits accordingly:
+Releases are fully automated by CI: every push to master is checked for [Conventional Commits](https://www.conventionalcommits.org/) since the last tag, and a matching version bump + changelog + tag + release with binaries is produced in the same pipeline run. Prefix your commits accordingly:
 
 - `fix: ...` → patch release, listed under Bug Fixes
 - `feat: ...` → minor release, listed under Features
