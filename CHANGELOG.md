@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 Entries from 0.1.1 onward are generated automatically by CI from conventional commits.
 
+## [0.10.0](https://github.com/atrastudhi/watchlite/compare/v0.9.0...v0.10.0) (2026-06-11)
+
+### Features
+
+* add inline SVG favicon (50c366b)
+* add --check-update for explicit version checks (78d7350)
+
+### Bug Fixes
+
+* drop per-state counts from the processes total line (83445e2)
+
+
 ## [0.9.0](https://github.com/atrastudhi/watchlite/compare/v0.8.0...v0.9.0) (2026-06-11)
 
 ### Features
