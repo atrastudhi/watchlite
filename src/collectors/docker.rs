@@ -12,7 +12,6 @@ use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const API: &str = "/v1.41";
 const MAX_CONTAINERS: usize = 50;
 
 /// First socket that accepts a connection wins: Docker, then rootful
@@ -97,7 +96,11 @@ struct MemStatsInner {
 /// `prev_cpu` is replaced with this tick's counters for next-tick deltas.
 pub fn collect(prev_cpu: &mut PrevCpu, socket_override: Option<&Path>) -> Option<Docker> {
     let socket = resolve_socket(socket_override)?;
-    let body = get(&socket, &format!("{API}/containers/json"))?;
+    // Unversioned paths: the daemon serves them at its own current API
+    // version. Versioned paths break both ways — old daemons don't know
+    // new versions, and new daemons drop old ones (Docker 29 rejects
+    // anything below v1.44).
+    let body = get(&socket, "/containers/json")?;
     let summaries: Vec<ContainerSummary> = serde_json::from_slice(&body).ok()?;
 
     let mut next_cpu = PrevCpu::new();
@@ -123,7 +126,7 @@ pub fn collect(prev_cpu: &mut PrevCpu, socket_override: Option<&Path>) -> Option
         if s.state == "running" {
             if let Some(stats) = get(
                 &socket,
-                &format!("{API}/containers/{}/stats?stream=false&one-shot=true", s.id),
+                &format!("/containers/{}/stats?stream=false&one-shot=true", s.id),
             )
             .and_then(|b| serde_json::from_slice::<Stats>(&b).ok())
             {
@@ -181,6 +184,13 @@ fn get(socket: &Path, path: &str) -> Option<Vec<u8>> {
     let headers = std::str::from_utf8(&raw[..header_end]).ok()?;
     let status = headers.split_whitespace().nth(1)?;
     if status != "200" {
+        // Log once so API rejections (version mismatch, permissions) are
+        // diagnosable instead of silently hiding the panel.
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static WARNED: AtomicBool = AtomicBool::new(false);
+        if !WARNED.swap(true, Ordering::Relaxed) {
+            eprintln!("container engine returned HTTP {status} for {path}");
+        }
         return None;
     }
     let body = &raw[header_end..];
