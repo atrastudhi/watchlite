@@ -8,6 +8,8 @@ let timer = null;
 let lastData = null;
 let sortKey = "cpu";
 let sortDir = -1;
+let dockerSortKey = null; // null = engine order until a header is clicked
+let dockerSortDir = -1;
 
 // process-state checklist: state -> shown (missing = shown); persisted
 let stateFilter = {};
@@ -257,7 +259,16 @@ function render(d) {
   if (d.docker) {
     const running = d.docker.containers.filter((c) => c.state === "running").length;
     $("docker-total").textContent = `${d.docker.containers.length} containers · ${running} running`;
-    $("docker-rows").innerHTML = d.docker.containers.map((c) =>
+    const containers = [...d.docker.containers];
+    if (dockerSortKey) {
+      containers.sort((a, b) =>
+        ((dockerSortKey === "cpu" ? a.cpu_pct : a.mem_bytes) -
+         (dockerSortKey === "cpu" ? b.cpu_pct : b.mem_bytes)) * dockerSortDir);
+    }
+    for (const k of ["cpu", "mem"]) {
+      $("arr-d" + k).textContent = dockerSortKey === k ? (dockerSortDir > 0 ? " ▴" : " ▾") : "";
+    }
+    $("docker-rows").innerHTML = containers.map((c) =>
       `<div class="gt-row"><span title="${esc(c.name)}">${esc(c.name)}</span>` +
       `<span class="dim" title="${esc(c.image)}">${esc(c.image)}</span>` +
       `<span class="state-${esc(c.state)}">${esc(c.state)}</span>` +
@@ -312,6 +323,16 @@ $("state-filter").addEventListener("change", (e) => {
   if (!st) return;
   stateFilter[st] = e.target.checked;
   try { localStorage.setItem("wl-state-filter", JSON.stringify(stateFilter)); } catch { /* private mode */ }
+  if (lastData) render(lastData);
+});
+
+// sortable docker headers (cpu/mem)
+$("docker-head").addEventListener("click", (e) => {
+  const th = e.target.closest("[data-dsort]");
+  if (!th) return;
+  const key = th.dataset.dsort;
+  dockerSortDir = dockerSortKey === key ? -dockerSortDir : -1;
+  dockerSortKey = key;
   if (lastData) render(lastData);
 });
 

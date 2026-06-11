@@ -122,8 +122,10 @@
         <span id="docker-total" class="head-dim"></span>
       </div>
       <div class="gt gt-docker">
-        <div class="gt-head">
-          <span>name</span><span>image</span><span>state</span><span class="num">cpu%</span><span class="num">mem</span>
+        <div class="gt-head" id="docker-head">
+          <span>name</span><span>image</span><span>state</span>
+          <span class="num sortable" data-dsort="cpu">cpu%<i id="arr-dcpu"></i></span>
+          <span class="num sortable" data-dsort="mem">mem<i id="arr-dmem"></i></span>
         </div>
         <div id="docker-rows" class="gt-body"></div>
       </div>
