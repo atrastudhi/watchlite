@@ -1,6 +1,6 @@
 [package]
 name = "watchlite"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "Ultra-lightweight single-binary server monitor with embedded web dashboard"
 license = "MIT"
