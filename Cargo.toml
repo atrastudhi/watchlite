@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/atrastudhi/watchlite"
 keywords = ["monitoring", "server", "dashboard", "metrics", "lightweight"]
 categories = ["command-line-utilities", "visualization"]
-rust-version = "1.79"
+rust-version = "1.95"  # floor set by sysinfo; enforced by the msrv CI job
 # keep the published crate tiny — assets and CI configs live in the repo only
 exclude = ["assets/", ".github/", "Dockerfile", ".dockerignore"]
 

@@ -36,11 +36,74 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
+  # The claimed minimum rust version must actually build.
+  msrv:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - run: cargo check --all-targets
+
+  # Run the real binary and verify the promises: endpoints respond, auth is
+  # enforced, and the release binary stays under the 1 MiB budget.
+  smoke:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: smoke-musl
+      - run: sudo apt-get update -q && sudo apt-get install -y -q musl-tools
+      - run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Binary size budget (1 MiB)
+        run: |
+          size=$(stat -c%s target/x86_64-unknown-linux-musl/release/watchlite)
+          echo "binary size: $size bytes"
+          [ "$size" -le 1048576 ] || { echo "::error::binary exceeds the 1 MiB budget"; exit 1; }
+      - name: Endpoint smoke test
+        run: |
+          set -euo pipefail
+          bin=target/x86_64-unknown-linux-musl/release/watchlite
+          "$bin" --version
+          "$bin" --bind 127.0.0.1:8077 --auth admin:secret &
+          pid=$!
+          sleep 4
+          code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          [ "$(code localhost:8077/healthz)" = 200 ]
+          [ "$(curl -s localhost:8077/healthz)" = ok ]
+          [ "$(code localhost:8077/api/stats)" = 401 ]
+          [ "$(code -u admin:secret localhost:8077/api/stats)" = 200 ]
+          [ "$(code -u admin:secret localhost:8077/)" = 200 ]
+          curl -s -u admin:secret localhost:8077/api/stats | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d['host']['hostname'], 'hostname missing'
+          assert d['processes']['total'] > 0, 'no processes'
+          assert d['disk_io'] is not None, 'disk_io null on linux'
+          assert d['connections'] is not None, 'connections null on linux'
+          "
+          curl -s -u admin:secret localhost:8077/metrics | grep -q '^watchlite_cpu_pct '
+          curl -s -u admin:secret localhost:8077/api/history | python3 -c "import json,sys; json.load(sys.stdin)['points']"
+          grep VmRSS "/proc/$pid/status"
+          kill "$pid"
+
   # Decide the bump from commit subjects since the last tag:
   #   feat!/BREAKING CHANGE -> major, feat -> minor, fix/perf -> patch,
   #   anything else -> no release (job succeeds with empty tag output).
   version:
-    needs: check
+    needs: [check, msrv, smoke]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
