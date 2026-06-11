@@ -58,6 +58,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
 | `--webhook <URL>` | | POST alert events as JSON via `curl`; Discord webhook URLs are auto-detected and get a Discord-formatted message |
 | `--once` | | Print one JSON snapshot to stdout and exit — for scripts: `watchlite --once \| jq .cpu.total_pct` |
+| `--check-update` | | Check GitHub releases for a newer version and exit (exit 2 if one exists; never runs automatically) |
 
 Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `WATCHLITE_AUTH`, `WATCHLITE_HISTORY`, `WATCHLITE_WEBHOOK` (flags win).
 

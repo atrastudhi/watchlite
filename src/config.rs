@@ -22,6 +22,8 @@ pub struct Config {
     pub webhook: Option<String>,
     /// Print one JSON snapshot to stdout and exit instead of serving.
     pub once: bool,
+    /// Check GitHub releases for a newer version and exit.
+    pub check_update: bool,
 }
 
 #[derive(Clone)]
@@ -58,6 +60,9 @@ OPTIONS:
                         get a Discord-formatted message.
     --once              Print one JSON snapshot to stdout and exit (for
                         scripts/cron; same shape as /api/stats)
+    --check-update      Check GitHub releases for a newer version and exit
+                        (0 = up to date, 2 = update available; never runs
+                        automatically)
     --version           Print version
     --help              Show this help
 
@@ -85,6 +90,7 @@ impl Config {
         let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
         let mut once = false;
+        let mut check_update = false;
 
         let mut args = env::args().skip(1);
         while let Some(arg) = args.next() {
@@ -104,6 +110,7 @@ impl Config {
                 "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
                 "--once" => once = true,
+                "--check-update" => check_update = true,
                 "--version" | "-V" => {
                     println!("watchlite {}", env!("CARGO_PKG_VERSION"));
                     exit(0);
@@ -175,6 +182,7 @@ impl Config {
             alerts,
             webhook,
             once,
+            check_update,
         }
     }
 }

@@ -6,9 +6,15 @@ mod persist;
 mod prom;
 mod sampler;
 mod state;
+mod update;
 
 fn main() {
     let config = config::Config::from_args();
+
+    if config.check_update {
+        std::process::exit(update::check());
+    }
+
     let state = state::Shared::new();
 
     let sampler_state = state.clone();
