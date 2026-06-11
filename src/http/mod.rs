@@ -57,6 +57,8 @@ fn handle(request: Request, config: &Config, state: &SharedState) {
         "/" | "/index.html" => asset(assets::INDEX_HTML, assets::CT_HTML),
         "/app.js" => asset(assets::APP_JS, assets::CT_JS),
         "/style.css" => asset(assets::STYLE_CSS, assets::CT_CSS),
+        // /favicon.ico covers clients that ignore <link rel=icon>
+        "/favicon.svg" | "/favicon.ico" => asset(assets::FAVICON_SVG, assets::CT_SVG),
         "/api/stats" => {
             let body = lock_or_recover(&state.json).clone();
             Response::from_string(body)

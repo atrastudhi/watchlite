@@ -60,7 +60,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--once` | | Print one JSON snapshot to stdout and exit — for scripts: `watchlite --once \| jq .cpu.total_pct` |
 | `--check-update` | | Check GitHub releases for a newer version and exit (exit 2 if one exists; never runs automatically) |
 
-Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `WATCHLITE_AUTH`, `WATCHLITE_HISTORY`, `WATCHLITE_WEBHOOK` (flags win).
+Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `WATCHLITE_AUTH`, `WATCHLITE_HISTORY`, `WATCHLITE_HISTORY_FILE`, `WATCHLITE_WEBHOOK`, `WATCHLITE_CONTAINER_SOCKET` (flags win).
 
 ## API
 

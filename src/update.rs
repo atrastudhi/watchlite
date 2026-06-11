@@ -1,21 +1,16 @@
 //! --check-update: explicit one-shot version check against GitHub releases.
 //! Only runs when the user asks — watchlite never phones home on its own.
 
-const RELEASES_API: &str = "https://api.github.com/repos/atrastudhi/watchlite/releases/latest";
-const RELEASES_URL: &str = "https://github.com/atrastudhi/watchlite/releases/latest";
+/// Derived from Cargo.toml's repository field so forks stay correct.
+const REPO_URL: &str = env!("CARGO_PKG_REPOSITORY");
 
 /// Exit codes: 0 = up to date, 1 = check failed, 2 = update available.
 pub fn check() -> i32 {
     let current = env!("CARGO_PKG_VERSION");
+    let slug = REPO_URL.trim_start_matches("https://github.com/");
+    let api = format!("https://api.github.com/repos/{slug}/releases/latest");
     let out = std::process::Command::new("curl")
-        .args([
-            "-fsSL",
-            "-m",
-            "10",
-            "-H",
-            "User-Agent: watchlite",
-            RELEASES_API,
-        ])
+        .args(["-fsSL", "-m", "10", "-H", "User-Agent: watchlite", &api])
         .output();
     let body = match out {
         Ok(o) if o.status.success() => o.stdout,
@@ -38,8 +33,8 @@ pub fn check() -> i32 {
         println!("watchlite {current} -> {latest} available");
         println!("  binary: re-run the install one-liner from the README");
         println!("  cargo:  cargo install watchlite");
-        println!("  docker: docker pull ghcr.io/atrastudhi/watchlite:latest");
-        println!("  {RELEASES_URL}");
+        println!("  docker: docker pull ghcr.io/{slug}:latest");
+        println!("  {REPO_URL}/releases/latest");
         2
     } else {
         println!("watchlite {current} is up to date");
