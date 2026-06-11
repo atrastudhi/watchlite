@@ -181,7 +181,7 @@ jobs:
           git tag -a "v$new" -m "watchlite v$new"
           git push origin HEAD:master "refs/tags/v$new"
           echo "tag=v$new" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.bump.outputs.tag != ''
         with:
           name: release-notes
@@ -232,7 +232,7 @@ jobs:
         run: |
           cp "target/${{ matrix.target }}/release/watchlite" "watchlite-${{ matrix.target }}"
           shasum -a 256 "watchlite-${{ matrix.target }}" > "watchlite-${{ matrix.target }}.sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: watchlite-${{ matrix.target }}
           path: |
