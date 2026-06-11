@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 Entries from 0.1.1 onward are generated automatically by CI from conventional commits.
 
+## [0.6.0](https://github.com/atrastudhi/watchlite/compare/v0.5.0...v0.6.0) (2026-06-11)
+
+### Features
+
+* add --once flag for one-shot JSON snapshots (240c5f8)
+
+
 ## [0.5.0](https://github.com/atrastudhi/watchlite/compare/v0.4.0...v0.5.0) (2026-06-11)
 
 ### Features
