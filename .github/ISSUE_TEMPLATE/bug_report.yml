@@ -1,0 +1,45 @@
+name: Bug report
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: watchlite version
+      description: Output of `watchlite --version`
+      placeholder: watchlite 0.5.0
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed?
+      options:
+        - Prebuilt binary (curl from Releases)
+        - cargo install
+        - Docker (ghcr.io image)
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and architecture
+      placeholder: Ubuntu 24.04 x86_64 / macOS 15 arm64 / Alpine in Docker ...
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you see, what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: >
+        stderr logs, and if a panel shows wrong data, the matching part of
+        `curl localhost:8077/api/stats`. Redact anything sensitive.
+      render: text

@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Dependency updates ship in the binary, so merging one should release:
+  # the fix(deps) prefix makes the pipeline cut a patch version.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "fix(deps)"
+  # Workflow actions don't ship to users; no release needed.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
