@@ -29,6 +29,10 @@ docker run --rm --platform linux/amd64 -v "$PWD":/app -w /app rust:alpine \
 
 MSRV is 1.95 (floor set by sysinfo, CI-enforced). sysinfo's API churns across 0.x versions — treat its upgrades as migrations, not routine bumps.
 
+## NEVER push without explicit user approval
+
+Every push to master containing `feat:`/`fix:` commits immediately cuts a public release to GitHub, crates.io, and GHCR. To keep the version history meaningful: **commit locally as much as needed, but only `git push` when the user explicitly says to.** Batch related work — one push containing several commits produces a single release (the highest bump wins), which is the intended way to avoid version churn.
+
 ## Releases are fully automated — never do them manually
 
 One workflow (`.github/workflows/ci.yml`) does everything on pushes to master: check/msrv/smoke gates → version bump → CHANGELOG section → annotated tag → 4-target binaries → GitHub release → crates.io (OIDC trusted publishing) → multi-arch GHCR image.
