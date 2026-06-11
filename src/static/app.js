@@ -9,6 +9,11 @@ let lastData = null;
 let sortKey = "cpu";
 let sortDir = -1;
 
+// process-state checklist: state -> shown (missing = shown); persisted
+let stateFilter = {};
+try { stateFilter = JSON.parse(localStorage.getItem("wl-state-filter")) || {}; } catch { /* defaults */ }
+let stateFilterSig = "";
+
 // ring buffers for charts
 const hist = { cpu: [], mem: [], rx: [], tx: [] };
 
@@ -223,10 +228,15 @@ function render(d) {
       : "";
   }
 
-  // processes — full list from server, sorted client-side
+  // processes — full list from server; state checklist + sort client-side
+  const stateCounts = {};
+  for (const p of d.processes.list) stateCounts[p.state] = (stateCounts[p.state] || 0) + 1;
+  renderStateFilter(stateCounts);
+  const visible = d.processes.list.filter((p) => stateFilter[p.state] !== false);
   $("proc-total").textContent = `${d.processes.total} total · ${d.processes.running} running` +
-    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : " · 0 zombie");
-  const procs = [...d.processes.list].sort((a, b) => {
+    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : " · 0 zombie") +
+    (visible.length !== d.processes.list.length ? ` · ${visible.length} shown` : "");
+  const procs = [...visible].sort((a, b) => {
     const va = sortKey === "cpu" ? a.cpu_pct : sortKey === "mem" ? a.mem_bytes : a[sortKey];
     const vb = sortKey === "cpu" ? b.cpu_pct : sortKey === "mem" ? b.mem_bytes : b[sortKey];
     return (sortKey === "name" ? String(va).localeCompare(String(vb)) : va - vb) * sortDir;
@@ -278,6 +288,32 @@ async function refresh() {
     $("conn").className = "conn-dot lost";
   }
 }
+
+// process state checklist: rebuilt only when the set of states changes,
+// counts updated in place every tick
+function renderStateFilter(counts) {
+  const states = Object.keys(counts).sort();
+  const sig = states.join(",");
+  if (sig !== stateFilterSig) {
+    stateFilterSig = sig;
+    $("state-filter").innerHTML = states.map((s) =>
+      `<label><input type="checkbox" data-state="${esc(s)}"${stateFilter[s] === false ? "" : " checked"}>` +
+      `${esc(s)} <span class="dim" id="sfc-${esc(s)}"></span></label>`
+    ).join("");
+  }
+  for (const s of states) {
+    const el = $("sfc-" + s);
+    if (el) el.textContent = counts[s];
+  }
+}
+
+$("state-filter").addEventListener("change", (e) => {
+  const st = e.target.dataset.state;
+  if (!st) return;
+  stateFilter[st] = e.target.checked;
+  try { localStorage.setItem("wl-state-filter", JSON.stringify(stateFilter)); } catch { /* private mode */ }
+  if (lastData) render(lastData);
+});
 
 // sortable process headers
 $("proc-head").addEventListener("click", (e) => {

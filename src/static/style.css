@@ -247,6 +247,20 @@ h2 {
 .gt .rx { color: var(--accent); }
 .gt .tx { color: var(--yellow); }
 
+.state-filter { display: flex; gap: 10px; align-items: center; }
+.state-filter label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.state-filter label:hover { color: var(--fg); }
+.state-filter input { accent-color: var(--accent); width: 11px; height: 11px; margin: 0; cursor: pointer; }
+
 .sortable { cursor: pointer; user-select: none; }
 .sortable:hover { color: var(--fg); }
 .sortable i { font-style: normal; }
