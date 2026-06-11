@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 Entries from 0.1.1 onward are generated automatically by CI from conventional commits.
 
+## [0.8.0](https://github.com/atrastudhi/watchlite/compare/v0.7.1...v0.8.0) (2026-06-11)
+
+### Features
+
+* filter the process table by state with a checklist (aeef0a7)
+
+
 ## [0.7.1](https://github.com/atrastudhi/watchlite/compare/v0.7.0...v0.7.1) (2026-06-11)
 
 ### Bug Fixes
