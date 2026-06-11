@@ -235,9 +235,8 @@ function render(d) {
   for (const p of d.processes.list) stateCounts[p.state] = (stateCounts[p.state] || 0) + 1;
   renderStateFilter(stateCounts);
   const visible = d.processes.list.filter((p) => stateFilter[p.state] !== false);
-  $("proc-total").textContent = `${d.processes.total} total · ${d.processes.running} running` +
-    (d.processes.zombie ? ` · ${d.processes.zombie} zombie` : " · 0 zombie") +
-    (visible.length !== d.processes.list.length ? ` · ${visible.length} shown` : "");
+  // per-state counts live in the checklist; keep this line to the total
+  $("proc-total").textContent = `${d.processes.total} total`;
   const procs = [...visible].sort((a, b) => {
     const va = sortKey === "cpu" ? a.cpu_pct : sortKey === "mem" ? a.mem_bytes : a[sortKey];
     const vb = sortKey === "cpu" ? b.cpu_pct : sortKey === "mem" ? b.mem_bytes : b[sortKey];
