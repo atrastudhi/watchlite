@@ -16,6 +16,8 @@ pub struct Config {
     pub history: Duration,
     /// Where chart history is persisted across restarts; None disables.
     pub history_file: Option<PathBuf>,
+    /// Explicit container engine socket; None probes Docker/Podman defaults.
+    pub container_socket: Option<PathBuf>,
     pub alerts: Vec<AlertSpec>,
     pub webhook: Option<String>,
 }
@@ -38,7 +40,10 @@ OPTIONS:
                         Use 0.0.0.0:8077 to allow remote access.
     --interval <SECS>   Sampling interval in seconds (default: 2)
     --top <N>           Cap the process list sent to the UI (0 = all, default)
-    --no-docker         Disable the Docker collector
+    --no-docker         Disable the container collector
+    --container-socket <P>  Container engine socket. Default: probes
+                        /var/run/docker.sock, /run/podman/podman.sock,
+                        $XDG_RUNTIME_DIR/podman/podman.sock
     --auth <USER:PASS>  Require HTTP Basic auth
     --history <SECS>    Sample history kept in RAM (default: 3600)
     --history-file <P>  Persist chart history to this file, saved once a
@@ -52,7 +57,8 @@ OPTIONS:
 
 ENVIRONMENT (flags take precedence):
     WATCHLITE_BIND, WATCHLITE_INTERVAL, WATCHLITE_TOP, WATCHLITE_AUTH,
-    WATCHLITE_HISTORY, WATCHLITE_HISTORY_FILE, WATCHLITE_WEBHOOK
+    WATCHLITE_HISTORY, WATCHLITE_HISTORY_FILE, WATCHLITE_WEBHOOK,
+    WATCHLITE_CONTAINER_SOCKET
 ";
 
 fn fail(msg: &str) -> ! {
@@ -68,6 +74,7 @@ impl Config {
         let mut auth = env::var("WATCHLITE_AUTH").ok();
         let mut history = env::var("WATCHLITE_HISTORY").unwrap_or_else(|_| "3600".into());
         let mut history_file_arg = env::var("WATCHLITE_HISTORY_FILE").ok();
+        let mut container_socket = env::var("WATCHLITE_CONTAINER_SOCKET").ok();
         let mut webhook = env::var("WATCHLITE_WEBHOOK").ok();
         let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
@@ -85,6 +92,7 @@ impl Config {
                 "--auth" => auth = Some(take("--auth")),
                 "--history" => history = take("--history"),
                 "--history-file" => history_file_arg = Some(take("--history-file")),
+                "--container-socket" => container_socket = Some(take("--container-socket")),
                 "--alert" => alert_specs.push(take("--alert")),
                 "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
@@ -153,6 +161,9 @@ impl Config {
             auth,
             history: Duration::from_secs(history),
             history_file: resolve_history_file(history_file_arg),
+            container_socket: container_socket
+                .filter(|s| !s.is_empty())
+                .map(PathBuf::from),
             alerts,
             webhook,
         }

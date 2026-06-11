@@ -112,7 +112,7 @@ pub fn run(state: SharedState, config: Config) {
         });
 
         let docker_stats = if config.docker {
-            docker::collect(&mut prev.docker_cpu)
+            docker::collect(&mut prev.docker_cpu, config.container_socket.as_deref())
         } else {
             None
         };

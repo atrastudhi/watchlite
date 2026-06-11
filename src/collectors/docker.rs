@@ -1,4 +1,5 @@
-//! Minimal Docker Engine API client over the unix socket.
+//! Minimal container engine API client over the unix socket. Works with
+//! Docker and Podman (which speaks the same REST API on its own socket).
 //! Deliberately hand-rolled (no bollard/hyper/tokio) to keep the binary tiny.
 
 #![cfg(unix)]
@@ -8,11 +9,31 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const SOCKET: &str = "/var/run/docker.sock";
 const API: &str = "/v1.41";
 const MAX_CONTAINERS: usize = 50;
+
+/// First socket that accepts a connection wins: Docker, then rootful
+/// Podman, then rootless Podman. An explicit override skips probing.
+fn resolve_socket(over: Option<&Path>) -> Option<PathBuf> {
+    if let Some(p) = over {
+        return Some(p.to_path_buf());
+    }
+    let mut candidates = vec![
+        PathBuf::from("/var/run/docker.sock"),
+        PathBuf::from("/run/podman/podman.sock"),
+    ];
+    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
+        if !dir.is_empty() {
+            candidates.push(PathBuf::from(dir).join("podman/podman.sock"));
+        }
+    }
+    candidates
+        .into_iter()
+        .find(|p| UnixStream::connect(p).is_ok())
+}
 
 /// Previous-tick CPU counters per container id: (cpu_total_ns, system_cpu_ns).
 pub type PrevCpu = HashMap<String, (u64, u64)>;
@@ -71,11 +92,12 @@ struct MemStatsInner {
     cache: u64,
 }
 
-/// Collect container stats. Returns None on any failure (Docker absent,
+/// Collect container stats. Returns None on any failure (engine absent,
 /// daemon down, malformed response) — the dashboard hides the panel.
 /// `prev_cpu` is replaced with this tick's counters for next-tick deltas.
-pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
-    let body = get(&format!("{API}/containers/json"))?;
+pub fn collect(prev_cpu: &mut PrevCpu, socket_override: Option<&Path>) -> Option<Docker> {
+    let socket = resolve_socket(socket_override)?;
+    let body = get(&socket, &format!("{API}/containers/json"))?;
     let summaries: Vec<ContainerSummary> = serde_json::from_slice(&body).ok()?;
 
     let mut next_cpu = PrevCpu::new();
@@ -99,10 +121,10 @@ pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
         };
 
         if s.state == "running" {
-            if let Some(stats) = get(&format!(
-                "{API}/containers/{}/stats?stream=false&one-shot=true",
-                s.id
-            ))
+            if let Some(stats) = get(
+                &socket,
+                &format!("{API}/containers/{}/stats?stream=false&one-shot=true", s.id),
+            )
             .and_then(|b| serde_json::from_slice::<Stats>(&b).ok())
             {
                 let cur = (
@@ -140,8 +162,8 @@ pub fn collect(prev_cpu: &mut PrevCpu) -> Option<Docker> {
 
 /// One HTTP/1.1 GET over the unix socket. Connection: close, so we read to
 /// EOF and then deal with Content-Length vs chunked framing.
-fn get(path: &str) -> Option<Vec<u8>> {
-    let mut stream = UnixStream::connect(SOCKET).ok()?;
+fn get(socket: &Path, path: &str) -> Option<Vec<u8>> {
+    let mut stream = UnixStream::connect(socket).ok()?;
     stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
     stream
         .set_write_timeout(Some(Duration::from_secs(3)))

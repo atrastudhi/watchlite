@@ -10,11 +10,11 @@ An ultra-lightweight, single-binary server monitor with an embedded web dashboar
 
 - **Single static binary under 1 MB**, ~11 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
-- **Metrics**: CPU (model, total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, full sortable process list with states, Docker containers
+- **Metrics**: CPU (model, total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, full sortable process list with states, Docker/Podman containers
 - **History**: ring buffer (1h default) served at `/api/history` — charts survive page reloads *and* process restarts (saved to a small state file once a minute)
 - **Alerts**: `--alert cpu>90` style thresholds with hysteresis; events log to stderr and optionally POST to a webhook
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
-- Docker stats via the unix socket with a hand-rolled client — no daemon polling cost, gracefully hidden when Docker is absent
+- Container stats via the engine's unix socket with a hand-rolled client — Docker and Podman sockets are probed automatically (`--container-socket` overrides; rootless Podman needs `systemctl --user enable --now podman.socket`), gracefully hidden when no engine is present
 
 ## Install
 
@@ -50,7 +50,8 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--bind <ADDR>` | `127.0.0.1:8077` | Listen address (`0.0.0.0:...` for remote access) |
 | `--interval <SECS>` | `2` | Sampling interval (0.5–3600) |
 | `--top <N>` | `0` (all) | Cap the process list sent to the UI (0–10000) |
-| `--no-docker` | | Disable the Docker collector |
+| `--no-docker` | | Disable the container collector |
+| `--container-socket <P>` | auto | Engine socket; probes Docker then Podman (rootful, rootless) paths |
 | `--auth <USER:PASS>` | | Require HTTP Basic auth |
 | `--history <SECS>` | `3600` | Sample history kept in RAM (60–86400) |
 | `--history-file <P>` | state dir | Persist chart history across restarts (`none` disables); defaults to systemd's `$STATE_DIRECTORY` or `~/.local/state/watchlite/` |
