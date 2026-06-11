@@ -115,12 +115,7 @@ fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&
         spec.metric, spec.threshold
     );
     let Some(url) = webhook else { return };
-    let payload = format!(
-        "{{\"host\":\"{}\",\"metric\":\"{}\",\"value\":{value},\"threshold\":{},\"state\":\"{event}\"}}",
-        host.replace('"', ""),
-        spec.metric,
-        spec.threshold
-    );
+    let payload = payload_for(url, host, spec, value, event);
     let spawned = std::process::Command::new("curl")
         .args([
             "-fsS",
@@ -146,6 +141,27 @@ fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&
         }
         Err(e) => eprintln!("alert webhook failed (is curl installed?): {e}"),
     }
+}
+
+/// Discord webhook URLs are auto-detected and get Discord's `content`
+/// payload shape; everything else gets the generic JSON event.
+fn payload_for(url: &str, host: &str, spec: &AlertSpec, value: f64, event: &str) -> String {
+    let host = host.replace(['"', '\\'], "");
+    if url.contains("discord.com/api/webhooks/") || url.contains("discordapp.com/api/webhooks/") {
+        let emoji = if event == "firing" {
+            "\u{1F534}"
+        } else {
+            "\u{1F7E2}"
+        };
+        return format!(
+            "{{\"content\":\"{emoji} **{}** on **{host}**: {value}% (threshold {}%) \u{2014} {event}\"}}",
+            spec.metric, spec.threshold
+        );
+    }
+    format!(
+        "{{\"host\":\"{host}\",\"metric\":\"{}\",\"value\":{value},\"threshold\":{},\"state\":\"{event}\"}}",
+        spec.metric, spec.threshold
+    )
 }
 
 #[cfg(test)]
@@ -210,6 +226,32 @@ mod tests {
             webhook: None,
             hostname: String::new(),
         }
+    }
+
+    #[test]
+    fn payload_shapes_by_destination() {
+        let spec = AlertSpec {
+            metric: "cpu".into(),
+            threshold: 90.0,
+        };
+        let generic = payload_for("https://ntfy.sh/topic", "web-01", &spec, 94.2, "firing");
+        assert_eq!(
+            generic,
+            "{\"host\":\"web-01\",\"metric\":\"cpu\",\"value\":94.2,\"threshold\":90,\"state\":\"firing\"}"
+        );
+
+        let discord = payload_for(
+            "https://discord.com/api/webhooks/123/abc",
+            "web-01",
+            &spec,
+            94.2,
+            "firing",
+        );
+        assert!(discord.starts_with("{\"content\":\""), "{discord}");
+        assert!(discord.contains("**cpu** on **web-01**: 94.2% (threshold 90%)"));
+        // valid JSON either way
+        serde_json::from_str::<serde_json::Value>(&generic).unwrap();
+        serde_json::from_str::<serde_json::Value>(&discord).unwrap();
     }
 
     #[test]

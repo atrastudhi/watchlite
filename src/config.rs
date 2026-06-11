@@ -53,7 +53,9 @@ OPTIONS:
                         $STATE_DIRECTORY (systemd) or ~/.local/state/watchlite/
     --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
                         metric one of cpu, mem, disk. Example: --alert cpu>90
-    --webhook <URL>     POST alert events as JSON (uses curl; needed for https)
+    --webhook <URL>     POST alert events as JSON (uses curl; needed for
+                        https). Discord webhook URLs are auto-detected and
+                        get a Discord-formatted message.
     --once              Print one JSON snapshot to stdout and exit (for
                         scripts/cron; same shape as /api/stats)
     --version           Print version
