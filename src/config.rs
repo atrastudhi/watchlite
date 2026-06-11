@@ -20,6 +20,8 @@ pub struct Config {
     pub container_socket: Option<PathBuf>,
     pub alerts: Vec<AlertSpec>,
     pub webhook: Option<String>,
+    /// Print one JSON snapshot to stdout and exit instead of serving.
+    pub once: bool,
 }
 
 #[derive(Clone)]
@@ -52,6 +54,8 @@ OPTIONS:
     --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
                         metric one of cpu, mem, disk. Example: --alert cpu>90
     --webhook <URL>     POST alert events as JSON (uses curl; needed for https)
+    --once              Print one JSON snapshot to stdout and exit (for
+                        scripts/cron; same shape as /api/stats)
     --version           Print version
     --help              Show this help
 
@@ -78,6 +82,7 @@ impl Config {
         let mut webhook = env::var("WATCHLITE_WEBHOOK").ok();
         let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
+        let mut once = false;
 
         let mut args = env::args().skip(1);
         while let Some(arg) = args.next() {
@@ -96,6 +101,7 @@ impl Config {
                 "--alert" => alert_specs.push(take("--alert")),
                 "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
+                "--once" => once = true,
                 "--version" | "-V" => {
                     println!("watchlite {}", env!("CARGO_PKG_VERSION"));
                     exit(0);
@@ -166,6 +172,7 @@ impl Config {
                 .map(PathBuf::from),
             alerts,
             webhook,
+            once,
         }
     }
 }

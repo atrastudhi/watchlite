@@ -98,6 +98,8 @@ jobs:
           curl -s -u admin:secret localhost:8077/api/history | python3 -c "import json,sys; json.load(sys.stdin)['points']"
           grep VmRSS "/proc/$pid/status"
           kill "$pid"
+          # --once prints a parseable snapshot and exits
+          "$bin" --once | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['processes']['total'] > 0"
 
   # Decide the bump from commit subjects since the last tag:
   #   feat!/BREAKING CHANGE -> major, feat -> minor, fix/perf -> patch,

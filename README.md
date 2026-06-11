@@ -57,6 +57,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--history-file <P>` | state dir | Persist chart history across restarts (`none` disables); defaults to systemd's `$STATE_DIRECTORY` or `~/.local/state/watchlite/` |
 | `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
 | `--webhook <URL>` | | POST alert events as JSON (delivered via `curl`, so https works) |
+| `--once` | | Print one JSON snapshot to stdout and exit — for scripts: `watchlite --once \| jq .cpu.total_pct` |
 
 Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `WATCHLITE_AUTH`, `WATCHLITE_HISTORY`, `WATCHLITE_WEBHOOK` (flags win).
 
