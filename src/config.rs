@@ -1,5 +1,6 @@
 use std::env;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 
@@ -13,6 +14,8 @@ pub struct Config {
     pub auth: Option<String>,
     /// How much sample history to keep in RAM.
     pub history: Duration,
+    /// Where chart history is persisted across restarts; None disables.
+    pub history_file: Option<PathBuf>,
     pub alerts: Vec<AlertSpec>,
     pub webhook: Option<String>,
 }
@@ -38,6 +41,9 @@ OPTIONS:
     --no-docker         Disable the Docker collector
     --auth <USER:PASS>  Require HTTP Basic auth
     --history <SECS>    Sample history kept in RAM (default: 3600)
+    --history-file <P>  Persist chart history to this file, saved once a
+                        minute (pass 'none' to disable). Default:
+                        $STATE_DIRECTORY (systemd) or ~/.local/state/watchlite/
     --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
                         metric one of cpu, mem, disk. Example: --alert cpu>90
     --webhook <URL>     POST alert events as JSON (uses curl; needed for https)
@@ -46,7 +52,7 @@ OPTIONS:
 
 ENVIRONMENT (flags take precedence):
     WATCHLITE_BIND, WATCHLITE_INTERVAL, WATCHLITE_TOP, WATCHLITE_AUTH,
-    WATCHLITE_HISTORY, WATCHLITE_WEBHOOK
+    WATCHLITE_HISTORY, WATCHLITE_HISTORY_FILE, WATCHLITE_WEBHOOK
 ";
 
 fn fail(msg: &str) -> ! {
@@ -61,6 +67,7 @@ impl Config {
         let mut top_n = env::var("WATCHLITE_TOP").unwrap_or_else(|_| "0".into());
         let mut auth = env::var("WATCHLITE_AUTH").ok();
         let mut history = env::var("WATCHLITE_HISTORY").unwrap_or_else(|_| "3600".into());
+        let mut history_file_arg = env::var("WATCHLITE_HISTORY_FILE").ok();
         let mut webhook = env::var("WATCHLITE_WEBHOOK").ok();
         let mut alert_specs: Vec<String> = Vec::new();
         let mut docker = true;
@@ -77,6 +84,7 @@ impl Config {
                 "--top" => top_n = take("--top"),
                 "--auth" => auth = Some(take("--auth")),
                 "--history" => history = take("--history"),
+                "--history-file" => history_file_arg = Some(take("--history-file")),
                 "--alert" => alert_specs.push(take("--alert")),
                 "--webhook" => webhook = Some(take("--webhook")),
                 "--no-docker" => docker = false,
@@ -144,10 +152,41 @@ impl Config {
             docker,
             auth,
             history: Duration::from_secs(history),
+            history_file: resolve_history_file(history_file_arg),
             alerts,
             webhook,
         }
     }
+}
+
+/// Explicit flag/env wins ("none" disables); otherwise prefer systemd's
+/// StateDirectory, then XDG state dir, then ~/.local/state. None when no
+/// writable convention applies (e.g. scratch containers) — persistence is
+/// simply skipped.
+fn resolve_history_file(arg: Option<String>) -> Option<PathBuf> {
+    if let Some(p) = arg {
+        if p == "none" || p.is_empty() {
+            return None;
+        }
+        return Some(PathBuf::from(p));
+    }
+    if let Ok(d) = env::var("STATE_DIRECTORY") {
+        // may be a colon-separated list; the first entry is ours
+        if let Some(first) = d.split(':').next().filter(|s| !s.is_empty()) {
+            return Some(PathBuf::from(first).join("history.json"));
+        }
+    }
+    if let Ok(d) = env::var("XDG_STATE_HOME") {
+        if !d.is_empty() {
+            return Some(PathBuf::from(d).join("watchlite/history.json"));
+        }
+    }
+    if let Ok(h) = env::var("HOME") {
+        if !h.is_empty() {
+            return Some(PathBuf::from(h).join(".local/state/watchlite/history.json"));
+        }
+    }
+    None
 }
 
 pub fn base64_encode(input: &[u8]) -> String {

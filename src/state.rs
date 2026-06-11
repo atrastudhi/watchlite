@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -23,7 +23,7 @@ impl Shared {
     }
 }
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct HistPoint {
     pub ts: u64,
     pub cpu: f32,

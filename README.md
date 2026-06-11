@@ -11,7 +11,7 @@ An ultra-lightweight, single-binary server monitor with an embedded web dashboar
 - **Single static binary under 1 MB**, ~11 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
 - **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
 - **Metrics**: CPU (model, total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, full sortable process list with states, Docker containers
-- **History**: in-RAM ring buffer (1h default) — charts survive page reloads, served at `/api/history`
+- **History**: ring buffer (1h default) served at `/api/history` — charts survive page reloads *and* process restarts (saved to a small state file once a minute)
 - **Alerts**: `--alert cpu>90` style thresholds with hysteresis; events log to stderr and optionally POST to a webhook
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
 - Docker stats via the unix socket with a hand-rolled client — no daemon polling cost, gracefully hidden when Docker is absent
@@ -53,6 +53,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--no-docker` | | Disable the Docker collector |
 | `--auth <USER:PASS>` | | Require HTTP Basic auth |
 | `--history <SECS>` | `3600` | Sample history kept in RAM (60–86400) |
+| `--history-file <P>` | state dir | Persist chart history across restarts (`none` disables); defaults to systemd's `$STATE_DIRECTORY` or `~/.local/state/watchlite/` |
 | `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
 | `--webhook <URL>` | | POST alert events as JSON (delivered via `curl`, so https works) |
 
@@ -95,6 +96,8 @@ After=network.target
 ExecStart=/usr/local/bin/watchlite --bind 0.0.0.0:8077 --auth admin:CHANGE_ME
 Restart=always
 DynamicUser=yes
+# persists chart history across restarts (/var/lib/watchlite)
+StateDirectory=watchlite
 # Docker panel needs socket access; remove if unused:
 SupplementaryGroups=docker
 

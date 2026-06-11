@@ -44,6 +44,27 @@ pub fn run(state: SharedState, config: Config) {
     let mut alert_engine = AlertEngine::new(&config);
     let history_cap =
         (config.history.as_secs_f64() / config.interval.as_secs_f64()).ceil() as usize;
+
+    // restore persisted chart history so dashboards survive restarts
+    if let Some(path) = &config.history_file {
+        let min_ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+            .saturating_sub(config.history.as_secs());
+        let restored = crate::persist::load(path, min_ts, history_cap);
+        if !restored.is_empty() {
+            eprintln!(
+                "history: restored {} points from {}",
+                restored.len(),
+                path.display()
+            );
+            *lock_or_recover(&state.history) = restored;
+        }
+    }
+    let mut last_save = Instant::now();
+    let mut save_err_logged = false;
+
     let mut docker_was_up = false;
     let mut work = Duration::ZERO;
     loop {
@@ -158,6 +179,19 @@ pub fn run(state: SharedState, config: Config) {
             hist.push_back(point);
             while hist.len() > history_cap {
                 hist.pop_front();
+            }
+        }
+
+        if let Some(path) = &config.history_file {
+            if last_save.elapsed() >= Duration::from_secs(60) {
+                last_save = Instant::now();
+                let snapshot_hist = lock_or_recover(&state.history).clone();
+                if let Err(e) = crate::persist::save(path, &snapshot_hist) {
+                    if !save_err_logged {
+                        save_err_logged = true;
+                        eprintln!("history: persistence disabled ({}: {e})", path.display());
+                    }
+                }
             }
         }
 

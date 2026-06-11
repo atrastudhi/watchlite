@@ -2,6 +2,7 @@ mod alerts;
 mod collectors;
 mod config;
 mod http;
+mod persist;
 mod prom;
 mod sampler;
 mod state;
