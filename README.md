@@ -16,17 +16,40 @@ An ultra-lightweight, single-binary server monitor with an embedded web dashboar
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
 - Container stats via the engine's unix socket with a hand-rolled client — Docker and Podman sockets are probed automatically (`--container-socket` overrides; rootless Podman needs `systemctl --user enable --now podman.socket`), gracefully hidden when no engine is present
 
+## Supported platforms
+
+| Platform | Binary | Notes |
+|---|---|---|
+| Linux x86_64 / arm64 | ✅ static (musl — works on any distro, glibc or not) | Full feature set |
+| macOS arm64 / x86_64 | ✅ | No disk I/O, TCP connections, or fan panels (they read Linux `/proc`//`hwmon`); temperatures work |
+| Windows | ❌ | Not supported — relies on unix sockets and `/proc` |
+| FreeBSD & others | untested | May build via `cargo install`; Linux-only panels stay hidden |
+
 ## Install
 
-Grab a prebuilt static binary from [Releases](https://github.com/atrastudhi/watchlite/releases) — no runtime, no package manager:
+Prebuilt static binaries come from [Releases](https://github.com/atrastudhi/watchlite/releases) — no runtime, no package manager.
+
+**Linux** (x86_64 or arm64):
 
 ```sh
-# Linux (x86_64 or aarch64)
 curl -fsSL "https://github.com/atrastudhi/watchlite/releases/latest/download/watchlite-$(uname -m)-unknown-linux-musl" \
   -o /usr/local/bin/watchlite && chmod +x /usr/local/bin/watchlite
 ```
 
-Or with cargo: `cargo install watchlite`. Or Docker (multi-arch, <1 MB image):
+**macOS** (Apple Silicon or Intel):
+
+```sh
+curl -fsSL "https://github.com/atrastudhi/watchlite/releases/latest/download/watchlite-$(uname -m | sed 's/arm64/aarch64/')-apple-darwin" \
+  -o /usr/local/bin/watchlite && chmod +x /usr/local/bin/watchlite
+```
+
+**Any OS with a Rust toolchain** (1.95+):
+
+```sh
+cargo install watchlite
+```
+
+**Docker** (multi-arch, <1 MB image):
 
 ```sh
 docker run -d --name watchlite --pid=host --net=host --uts=host \
