@@ -14,24 +14,44 @@ use std::time::Duration;
 
 const MAX_CONTAINERS: usize = 50;
 
+enum Probe {
+    Found(PathBuf),
+    /// A socket exists but we may not connect — worth telling the user,
+    /// since its presence proves an engine is installed.
+    PermissionDenied(PathBuf),
+    NotFound,
+}
+
 /// First socket that accepts a connection wins: Docker, then rootful
 /// Podman, then rootless Podman. An explicit override skips probing.
-fn resolve_socket(over: Option<&Path>) -> Option<PathBuf> {
-    if let Some(p) = over {
-        return Some(p.to_path_buf());
-    }
-    let mut candidates = vec![
-        PathBuf::from("/var/run/docker.sock"),
-        PathBuf::from("/run/podman/podman.sock"),
-    ];
-    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-        if !dir.is_empty() {
-            candidates.push(PathBuf::from(dir).join("podman/podman.sock"));
+fn resolve_socket(over: Option<&Path>) -> Probe {
+    let candidates: Vec<PathBuf> = match over {
+        Some(p) => vec![p.to_path_buf()],
+        None => {
+            let mut v = vec![
+                PathBuf::from("/var/run/docker.sock"),
+                PathBuf::from("/run/podman/podman.sock"),
+            ];
+            if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
+                if !dir.is_empty() {
+                    v.push(PathBuf::from(dir).join("podman/podman.sock"));
+                }
+            }
+            v
+        }
+    };
+    let mut denied = None;
+    for p in candidates {
+        match UnixStream::connect(&p) {
+            Ok(_) => return Probe::Found(p),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => denied = Some(p),
+            Err(_) => {}
         }
     }
-    candidates
-        .into_iter()
-        .find(|p| UnixStream::connect(p).is_ok())
+    match denied {
+        Some(p) => Probe::PermissionDenied(p),
+        None => Probe::NotFound,
+    }
 }
 
 /// Previous-tick CPU counters per container id: (cpu_total_ns, system_cpu_ns).
@@ -91,16 +111,44 @@ struct MemStatsInner {
     cache: u64,
 }
 
-/// Collect container stats. Returns None on any failure (engine absent,
-/// daemon down, malformed response) — the dashboard hides the panel.
+/// Collect container stats. On failure returns (None, hint) where the hint
+/// tells the dashboard why the panel is empty — the panel stays visible so
+/// users can self-diagnose instead of wondering where it went.
 /// `prev_cpu` is replaced with this tick's counters for next-tick deltas.
-pub fn collect(prev_cpu: &mut PrevCpu, socket_override: Option<&Path>) -> Option<Docker> {
-    let socket = resolve_socket(socket_override)?;
+pub fn collect(
+    prev_cpu: &mut PrevCpu,
+    socket_override: Option<&Path>,
+) -> (Option<Docker>, Option<String>) {
+    let socket = match resolve_socket(socket_override) {
+        Probe::Found(p) => p,
+        Probe::PermissionDenied(p) => {
+            return (
+                None,
+                Some(format!(
+                    "{} found but permission denied \u{2014} add this user to the docker group",
+                    p.display()
+                )),
+            );
+        }
+        Probe::NotFound => {
+            return (None, Some("no Docker/Podman socket found".to_string()));
+        }
+    };
+    match collect_from(&socket, prev_cpu) {
+        Some(docker) => (Some(docker), None),
+        None => (
+            None,
+            Some("engine API error \u{2014} see server log".to_string()),
+        ),
+    }
+}
+
+fn collect_from(socket: &Path, prev_cpu: &mut PrevCpu) -> Option<Docker> {
     // Unversioned paths: the daemon serves them at its own current API
     // version. Versioned paths break both ways — old daemons don't know
     // new versions, and new daemons drop old ones (Docker 29 rejects
     // anything below v1.44).
-    let body = get(&socket, "/containers/json")?;
+    let body = get(socket, "/containers/json")?;
     let summaries: Vec<ContainerSummary> = serde_json::from_slice(&body).ok()?;
 
     let mut next_cpu = PrevCpu::new();
@@ -125,7 +173,7 @@ pub fn collect(prev_cpu: &mut PrevCpu, socket_override: Option<&Path>) -> Option
 
         if s.state == "running" {
             if let Some(stats) = get(
-                &socket,
+                socket,
                 &format!("/containers/{}/stats?stream=false&one-shot=true", s.id),
             )
             .and_then(|b| serde_json::from_slice::<Stats>(&b).ok())

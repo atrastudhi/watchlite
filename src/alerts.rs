@@ -206,6 +206,7 @@ mod tests {
                 list: vec![],
             },
             docker: None,
+            docker_hint: None,
             sensors: None,
             connections: None,
             alerts: vec![],

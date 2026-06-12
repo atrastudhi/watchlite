@@ -111,10 +111,10 @@ pub fn run(state: SharedState, config: Config) {
                 .collect()
         });
 
-        let docker_stats = if config.docker {
+        let (docker_stats, docker_hint) = if config.docker {
             docker::collect(&mut prev.docker_cpu, config.container_socket.as_deref())
         } else {
-            None
+            (None, None)
         };
         let docker_is_up = docker_stats.is_some();
         if config.docker && docker_is_up != docker_was_up {
@@ -143,6 +143,7 @@ pub fn run(state: SharedState, config: Config) {
             net: net_rates,
             processes: process::list(&sys, config.top_n),
             docker: docker_stats,
+            docker_hint,
             sensors: sensors::read(&components),
             connections: connections::read(),
             alerts: Vec::new(),

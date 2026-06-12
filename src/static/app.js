@@ -253,8 +253,15 @@ function render(d) {
     `<span class="num">${fmtBytes(p.mem_bytes)}</span></div>`
   ).join("");
 
-  // docker
-  $("panel-docker").hidden = !d.docker;
+  // docker — panel hidden only when the collector is disabled (--no-docker);
+  // otherwise show containers or the reason there are none
+  $("panel-docker").hidden = !d.docker && !d.docker_hint;
+  $("docker-gt").hidden = !d.docker;
+  $("docker-na").hidden = !d.docker_hint;
+  if (d.docker_hint) {
+    $("docker-na").textContent = d.docker_hint;
+    $("docker-total").textContent = "";
+  }
   if (d.docker) {
     const running = d.docker.containers.filter((c) => c.state === "running").length;
     $("docker-total").textContent = `${d.docker.containers.length} containers · ${running} running`;

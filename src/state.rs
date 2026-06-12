@@ -44,6 +44,9 @@ pub struct Snapshot {
     pub net: Vec<Net>,
     pub processes: Processes,
     pub docker: Option<Docker>,
+    /// Why `docker` is null (engine absent, permission denied, API error);
+    /// None when containers are flowing or the collector is disabled.
+    pub docker_hint: Option<String>,
     pub sensors: Option<Sensors>,
     pub connections: Option<Connections>,
     pub alerts: Vec<AlertStatus>,
