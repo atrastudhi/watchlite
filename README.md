@@ -61,6 +61,23 @@ The host namespaces are what let it report the host's processes, interfaces, con
 
 The native binary needs none of this — it's static, smaller than the image, and sees everything by default. Prefer it unless your infra is containers-only.
 
+### Containers panel not showing?
+
+The panel hides itself when no engine socket is reachable. With the native binary, the usual causes:
+
+1. **Not in the `docker` group** (socket is `root:docker`):
+   ```sh
+   sudo usermod -aG docker $USER
+   ```
+   Group changes need a fresh login — and if watchlite runs as a **systemd user service**, a plain re-login isn't enough because the lingering user manager caches the old groups: `sudo loginctl terminate-user $USER` (or reboot), then restart the service. System-wide units instead just need `SupplementaryGroups=docker` (see the unit below).
+2. **Rootless Podman socket not enabled** (it's off by default):
+   ```sh
+   systemctl --user enable --now podman.socket
+   ```
+3. **Non-standard socket path** — point at it directly with `--container-socket /path/to/sock`.
+
+To see what the collector sees: watchlite's stderr logs `docker collector: connected/unavailable` on state changes and a one-line HTTP error if the engine rejects requests; `curl --unix-socket /var/run/docker.sock http://localhost/containers/json` reproduces its exact call.
+
 ## Usage
 
 ```sh
