@@ -5,12 +5,16 @@ mod http;
 mod persist;
 mod prom;
 mod sampler;
+mod shutdown;
 mod state;
 mod update;
 
 fn main() {
     let config = config::Config::from_args();
     let state = state::Shared::new();
+
+    // catch SIGTERM/SIGINT so the sampler can flush history before exit
+    shutdown::install();
 
     let sampler_state = state.clone();
     let sampler_config = config.clone();

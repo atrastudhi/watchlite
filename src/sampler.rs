@@ -69,7 +69,11 @@ pub fn run(state: SharedState, config: Config) {
     let mut work = Duration::ZERO;
     loop {
         // Subtract last tick's sampling cost so ticks stay near the interval.
-        std::thread::sleep(config.interval.saturating_sub(work));
+        sleep_interruptible(config.interval.saturating_sub(work));
+        if crate::shutdown::requested() {
+            flush_history(&state, &config);
+            std::process::exit(0);
+        }
         let tick_start = Instant::now();
 
         sys.refresh_specifics(refresh);
@@ -197,6 +201,32 @@ pub fn run(state: SharedState, config: Config) {
         }
 
         work = tick_start.elapsed();
+    }
+}
+
+/// Sleep in short steps so a shutdown signal during the inter-tick wait is
+/// noticed promptly instead of after a full interval.
+fn sleep_interruptible(dur: Duration) {
+    let step = Duration::from_millis(200);
+    let mut remaining = dur;
+    while remaining > Duration::ZERO {
+        if crate::shutdown::requested() {
+            return;
+        }
+        let nap = remaining.min(step);
+        std::thread::sleep(nap);
+        remaining -= nap;
+    }
+}
+
+/// Persist whatever chart history we have, on the way out.
+fn flush_history(state: &SharedState, config: &Config) {
+    if let Some(path) = &config.history_file {
+        let hist = lock_or_recover(&state.history).clone();
+        match crate::persist::save(path, &hist) {
+            Ok(()) => eprintln!("shutdown: history saved to {}", path.display()),
+            Err(e) => eprintln!("shutdown: history save failed ({}: {e})", path.display()),
+        }
     }
 }
 
