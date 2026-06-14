@@ -61,9 +61,13 @@ pub struct Connections {
 
 #[derive(Serialize, Clone)]
 pub struct AlertStatus {
+    /// Display label: the metric, plus `:target` for scoped disk/temp rules
+    /// (e.g. "disk:/data").
     pub metric: String,
     pub value: f64,
     pub threshold: f64,
+    /// Unit the value/threshold are in: "%" for cpu/mem/swap/disk, "°C" for temp.
+    pub unit: String,
     pub since: u64,
 }
 

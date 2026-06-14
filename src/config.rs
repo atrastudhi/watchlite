@@ -26,8 +26,11 @@ pub struct Config {
 
 #[derive(Clone)]
 pub struct AlertSpec {
-    /// "cpu", "mem", or "disk" — all percentages.
+    /// "cpu", "mem", "swap", "disk" (percent) or "temp" (°C).
     pub metric: String,
+    /// Optional scope for `disk` (mount path) and `temp` (sensor-label
+    /// substring); None means "max across all of them".
+    pub target: Option<String>,
     pub threshold: f64,
 }
 
@@ -51,8 +54,11 @@ OPTIONS:
     --history-file <P>  Persist chart history to this file, saved once a
                         minute (pass 'none' to disable). Default:
                         $STATE_DIRECTORY (systemd) or ~/.local/state/watchlite/
-    --alert <SPEC>      Alert rule, repeatable. SPEC is metric>percent,
-                        metric one of cpu, mem, disk. Example: --alert cpu>90
+    --alert <SPEC>      Alert rule, repeatable. SPEC is metric[:target]>N.
+                        metric: cpu, mem, swap, disk (percent) or temp (C).
+                        :target scopes disk to a mount or temp to a sensor
+                        label substring. Examples: --alert cpu>90
+                        --alert 'disk:/data>85'  --alert temp>80
     --webhook <URL>     POST alert events as JSON (uses curl; needed for
                         https). Discord webhook URLs are auto-detected and
                         get a Discord-formatted message.
@@ -145,26 +151,7 @@ impl Config {
             .ok()
             .filter(|h| *h >= 60 && *h <= 86400)
             .unwrap_or_else(|| fail(&format!("invalid history seconds (60-86400): {history}")));
-        let alerts = alert_specs
-            .iter()
-            .map(|spec| {
-                let (metric, threshold) = spec.split_once('>').unwrap_or_else(|| {
-                    fail(&format!("invalid alert spec (want metric>percent): {spec}"))
-                });
-                if !["cpu", "mem", "disk"].contains(&metric) {
-                    fail(&format!("unknown alert metric (cpu, mem, disk): {metric}"));
-                }
-                let threshold: f64 = threshold
-                    .parse()
-                    .ok()
-                    .filter(|t| *t > 0.0 && *t < 100.0)
-                    .unwrap_or_else(|| fail(&format!("invalid alert threshold: {spec}")));
-                AlertSpec {
-                    metric: metric.to_string(),
-                    threshold,
-                }
-            })
-            .collect();
+        let alerts = alert_specs.iter().map(|spec| parse_alert(spec)).collect();
 
         Config {
             bind,
@@ -181,6 +168,45 @@ impl Config {
             webhook,
             once,
         }
+    }
+}
+
+/// Parse one `--alert` spec: `metric[:target]>threshold`. cpu/mem/swap/disk
+/// thresholds are percentages (0–100); temp is °C (0–200). `:target` scopes
+/// `disk` to a mount path or `temp` to a sensor-label substring.
+fn parse_alert(spec: &str) -> AlertSpec {
+    let (lhs, threshold) = spec.split_once('>').unwrap_or_else(|| {
+        fail(&format!(
+            "invalid alert spec (want metric>threshold): {spec}"
+        ))
+    });
+    let (metric, target) = match lhs.split_once(':') {
+        Some((m, t)) => (m, Some(t)),
+        None => (lhs, None),
+    };
+    if !["cpu", "mem", "swap", "disk", "temp"].contains(&metric) {
+        fail(&format!(
+            "unknown alert metric (cpu, mem, swap, disk, temp): {metric}"
+        ));
+    }
+    if let Some(t) = target {
+        if !["disk", "temp"].contains(&metric) {
+            fail(&format!("alert metric '{metric}' takes no :target: {spec}"));
+        }
+        if t.is_empty() {
+            fail(&format!("empty alert :target in {spec}"));
+        }
+    }
+    let max = if metric == "temp" { 200.0 } else { 100.0 };
+    let threshold: f64 = threshold
+        .parse()
+        .ok()
+        .filter(|t| *t > 0.0 && *t < max)
+        .unwrap_or_else(|| fail(&format!("invalid alert threshold (0-{max}): {spec}")));
+    AlertSpec {
+        metric: metric.to_string(),
+        target: target.map(str::to_string),
+        threshold,
     }
 }
 
@@ -242,7 +268,26 @@ pub fn base64_encode(input: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::base64_encode;
+    use super::{base64_encode, parse_alert};
+
+    #[test]
+    fn alert_spec_parsing() {
+        let a = parse_alert("cpu>90");
+        assert_eq!(a.metric, "cpu");
+        assert_eq!(a.target, None);
+        assert_eq!(a.threshold, 90.0);
+
+        let d = parse_alert("disk:/data>85");
+        assert_eq!(d.metric, "disk");
+        assert_eq!(d.target.as_deref(), Some("/data"));
+        assert_eq!(d.threshold, 85.0);
+
+        // temp accepts thresholds above 100 (°C, not percent)
+        let t = parse_alert("temp:Package>105");
+        assert_eq!(t.metric, "temp");
+        assert_eq!(t.target.as_deref(), Some("Package"));
+        assert_eq!(t.threshold, 105.0);
+    }
 
     #[test]
     fn base64_rfc4648_vectors() {

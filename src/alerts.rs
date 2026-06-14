@@ -46,23 +46,8 @@ impl AlertEngine {
         self.hostname = snap.host.hostname.clone();
         let mut firing = Vec::new();
         for rule in &mut self.rules {
-            let value = match rule.spec.metric.as_str() {
-                "cpu" => snap.cpu.total_pct as f64,
-                "mem" => {
-                    if snap.memory.total == 0 {
-                        0.0
-                    } else {
-                        snap.memory.used as f64 / snap.memory.total as f64 * 100.0
-                    }
-                }
-                "disk" => snap
-                    .disks
-                    .iter()
-                    .map(|d| d.used as f64 / d.total as f64 * 100.0)
-                    .fold(0.0, f64::max),
-                _ => 0.0,
-            };
-            let value = (value * 10.0).round() / 10.0;
+            let (raw, label, unit) = measure(&rule.spec, snap);
+            let value = (raw * 10.0).round() / 10.0;
 
             if value > rule.spec.threshold {
                 rule.over += 1;
@@ -77,8 +62,10 @@ impl AlertEngine {
                     rule.firing_since = Some(snap.ts);
                     emit(
                         &self.hostname,
-                        &rule.spec,
+                        &label,
                         value,
+                        rule.spec.threshold,
+                        unit,
                         "firing",
                         self.webhook.as_deref(),
                     );
@@ -87,8 +74,10 @@ impl AlertEngine {
                     rule.firing_since = None;
                     emit(
                         &self.hostname,
-                        &rule.spec,
+                        &label,
                         value,
+                        rule.spec.threshold,
+                        unit,
                         "resolved",
                         self.webhook.as_deref(),
                     );
@@ -98,9 +87,10 @@ impl AlertEngine {
 
             if let Some(since) = rule.firing_since {
                 firing.push(AlertStatus {
-                    metric: rule.spec.metric.clone(),
+                    metric: label,
                     value,
                     threshold: rule.spec.threshold,
+                    unit: unit.to_string(),
                     since,
                 });
             }
@@ -109,13 +99,66 @@ impl AlertEngine {
     }
 }
 
-fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&str>) {
-    eprintln!(
-        "alert {event}: {} {value}% (threshold {}%)",
-        spec.metric, spec.threshold
-    );
+/// Compute the current value, display label, and unit for a rule. `disk` and
+/// `temp` optionally scope to a target (mount path / sensor-label substring);
+/// without one they take the max across all disks / sensors.
+fn measure(spec: &AlertSpec, snap: &Snapshot) -> (f64, String, &'static str) {
+    let label = match &spec.target {
+        Some(t) => format!("{}:{t}", spec.metric),
+        None => spec.metric.clone(),
+    };
+    let value = match spec.metric.as_str() {
+        "cpu" => snap.cpu.total_pct as f64,
+        "mem" => pct(snap.memory.used, snap.memory.total),
+        "swap" => pct(snap.memory.swap_used, snap.memory.swap_total),
+        "disk" => snap
+            .disks
+            .iter()
+            .filter(|d| spec.target.as_deref().is_none_or(|t| d.mount == t))
+            .map(|d| pct(d.used, d.total))
+            .fold(0.0, f64::max),
+        "temp" => snap
+            .sensors
+            .as_ref()
+            .map(|s| {
+                s.temps
+                    .iter()
+                    .filter(|t| spec.target.as_deref().is_none_or(|q| t.label.contains(q)))
+                    .map(|t| t.temp_c as f64)
+                    .fold(0.0, f64::max)
+            })
+            .unwrap_or(0.0),
+        _ => 0.0,
+    };
+    let unit = if spec.metric == "temp" {
+        "\u{b0}C"
+    } else {
+        "%"
+    };
+    (value, label, unit)
+}
+
+fn pct(used: u64, total: u64) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        used as f64 / total as f64 * 100.0
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit(
+    host: &str,
+    label: &str,
+    value: f64,
+    threshold: f64,
+    unit: &str,
+    event: &str,
+    webhook: Option<&str>,
+) {
+    eprintln!("alert {event}: {label} {value}{unit} (threshold {threshold}{unit})");
     let Some(url) = webhook else { return };
-    let payload = payload_for(url, host, spec, value, event);
+    let payload = payload_for(url, host, label, value, threshold, unit, event);
     let spawned = std::process::Command::new("curl")
         .args([
             "-fsS",
@@ -145,8 +188,17 @@ fn emit(host: &str, spec: &AlertSpec, value: f64, event: &str, webhook: Option<&
 
 /// Discord webhook URLs are auto-detected and get Discord's `content`
 /// payload shape; everything else gets the generic JSON event.
-fn payload_for(url: &str, host: &str, spec: &AlertSpec, value: f64, event: &str) -> String {
+fn payload_for(
+    url: &str,
+    host: &str,
+    label: &str,
+    value: f64,
+    threshold: f64,
+    unit: &str,
+    event: &str,
+) -> String {
     let host = host.replace(['"', '\\'], "");
+    let label = label.replace(['"', '\\'], "");
     if url.contains("discord.com/api/webhooks/") || url.contains("discordapp.com/api/webhooks/") {
         let emoji = if event == "firing" {
             "\u{1F534}"
@@ -154,13 +206,11 @@ fn payload_for(url: &str, host: &str, spec: &AlertSpec, value: f64, event: &str)
             "\u{1F7E2}"
         };
         return format!(
-            "{{\"content\":\"{emoji} **{}** on **{host}**: {value}% (threshold {}%) \u{2014} {event}\"}}",
-            spec.metric, spec.threshold
+            "{{\"content\":\"{emoji} **{label}** on **{host}**: {value}{unit} (threshold {threshold}{unit}) \u{2014} {event}\"}}"
         );
     }
     format!(
-        "{{\"host\":\"{host}\",\"metric\":\"{}\",\"value\":{value},\"threshold\":{},\"state\":\"{event}\"}}",
-        spec.metric, spec.threshold
+        "{{\"host\":\"{host}\",\"metric\":\"{label}\",\"value\":{value},\"threshold\":{threshold},\"unit\":\"{unit}\",\"state\":\"{event}\"}}"
     )
 }
 
@@ -218,6 +268,7 @@ mod tests {
             rules: vec![RuleState {
                 spec: AlertSpec {
                     metric: "cpu".into(),
+                    target: None,
                     threshold,
                 },
                 over: 0,
@@ -231,28 +282,82 @@ mod tests {
 
     #[test]
     fn payload_shapes_by_destination() {
-        let spec = AlertSpec {
-            metric: "cpu".into(),
-            threshold: 90.0,
-        };
-        let generic = payload_for("https://ntfy.sh/topic", "web-01", &spec, 94.2, "firing");
+        let generic = payload_for(
+            "https://ntfy.sh/topic",
+            "web-01",
+            "cpu",
+            94.2,
+            90.0,
+            "%",
+            "firing",
+        );
         assert_eq!(
             generic,
-            "{\"host\":\"web-01\",\"metric\":\"cpu\",\"value\":94.2,\"threshold\":90,\"state\":\"firing\"}"
+            "{\"host\":\"web-01\",\"metric\":\"cpu\",\"value\":94.2,\"threshold\":90,\"unit\":\"%\",\"state\":\"firing\"}"
         );
 
         let discord = payload_for(
             "https://discord.com/api/webhooks/123/abc",
             "web-01",
-            &spec,
+            "cpu",
             94.2,
+            90.0,
+            "%",
             "firing",
         );
         assert!(discord.starts_with("{\"content\":\""), "{discord}");
         assert!(discord.contains("**cpu** on **web-01**: 94.2% (threshold 90%)"));
-        // valid JSON either way
-        serde_json::from_str::<serde_json::Value>(&generic).unwrap();
-        serde_json::from_str::<serde_json::Value>(&discord).unwrap();
+
+        // scoped disk rule with °C unit and a path in the label still serializes
+        let temp = payload_for(
+            "https://ntfy.sh/topic",
+            "web-01",
+            "temp:Package",
+            81.0,
+            80.0,
+            "\u{b0}C",
+            "firing",
+        );
+        // valid JSON in every shape
+        for p in [&generic, &discord, &temp] {
+            serde_json::from_str::<serde_json::Value>(p).unwrap();
+        }
+    }
+
+    #[test]
+    fn scoped_disk_targets_one_mount() {
+        let mut snap = snapshot(0.0);
+        snap.disks = vec![
+            Disk {
+                mount: "/".into(),
+                fs: "ext4".into(),
+                total: 100,
+                used: 10,
+            },
+            Disk {
+                mount: "/data".into(),
+                fs: "ext4".into(),
+                total: 100,
+                used: 95,
+            },
+        ];
+        let scoped = AlertSpec {
+            metric: "disk".into(),
+            target: Some("/data".into()),
+            threshold: 90.0,
+        };
+        let (v, label, unit) = measure(&scoped, &snap);
+        assert_eq!(v, 95.0);
+        assert_eq!(label, "disk:/data");
+        assert_eq!(unit, "%");
+
+        // unscoped disk takes the busiest mount
+        let any = AlertSpec {
+            metric: "disk".into(),
+            target: None,
+            threshold: 90.0,
+        };
+        assert_eq!(measure(&any, &snap).0, 95.0);
     }
 
     #[test]
