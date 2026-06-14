@@ -95,7 +95,7 @@ watchlite --bind 0.0.0.0:8077 --auth admin:secret   # remote access with basic a
 | `--auth <USER:PASS>` | | Require HTTP Basic auth |
 | `--history <SECS>` | `3600` | Sample history kept in RAM (60–86400) |
 | `--history-file <P>` | state dir | Persist chart history across restarts (`none` disables); defaults to systemd's `$STATE_DIRECTORY` or `~/.local/state/watchlite/` |
-| `--alert <SPEC>` | | Alert rule, repeatable: `cpu>90`, `mem>85`, `disk>90` (percent; quote in shells) |
+| `--alert <SPEC>` | | Alert rule, repeatable: `metric[:target]>N`. Metrics: `cpu`, `mem`, `swap`, `disk` (percent) and `temp` (°C). `:target` scopes `disk` to a mount or `temp` to a sensor-label substring, e.g. `disk:/data>85`, `temp>80`. Quote in shells |
 | `--webhook <URL>` | | POST alert events as JSON via `curl`; Discord webhook URLs are auto-detected and get a Discord-formatted message |
 | `--once` | | Print one JSON snapshot to stdout and exit — for scripts: `watchlite --once \| jq .cpu.total_pct` |
 | `--check-update` | | Check GitHub releases for a newer version and exit (exit 2 if one exists; never runs automatically) |
@@ -108,12 +108,20 @@ Env-var equivalents: `WATCHLITE_BIND`, `WATCHLITE_INTERVAL`, `WATCHLITE_TOP`, `W
 |---|---|
 | `GET /api/stats` | Latest snapshot as JSON (one sample per interval; rates are bytes/sec from counter deltas) |
 | `GET /api/history` | Ring buffer of compact points: `{ts, cpu, mem, rx, tx}` |
-| `GET /metrics` | Prometheus text exposition format |
+| `GET /metrics` | Prometheus text exposition format (`watchlite_*` gauges) |
 | `GET /healthz` | Liveness probe: `200 ok` (never requires auth) |
+
+`/api/stats`, `/api/history` and `/metrics` are behind `--auth` when set; `/healthz` never is, so it works as a systemd `WatchdogSec`/Kubernetes liveness probe without leaking credentials. Scrape Prometheus straight off it:
+
+```yaml
+scrape_configs:
+  - job_name: watchlite
+    static_configs: [{ targets: ["server:8077"] }]
+```
 
 `disk_io` and `connections` are `null` on non-Linux hosts; `docker` is `null` when the Docker socket is unavailable; `sensors` is `null` when the host exposes none (typical for VMs). Fan speeds are Linux-only (`/sys/class/hwmon`).
 
-Alerts fire after the threshold is exceeded for 3 consecutive samples and resolve the same way (no flapping). Webhook payload: `{"host", "metric", "value", "threshold", "state": "firing"|"resolved"}`.
+Alerts fire after the threshold is exceeded for 3 consecutive samples and resolve the same way (no flapping). Webhook payload: `{"host", "metric", "value", "threshold", "unit", "state": "firing"|"resolved"}` (`metric` includes the `:target` for scoped rules). On `SIGTERM`/`SIGINT` (e.g. `systemctl stop`) watchlite flushes chart history before exiting so the dashboard's graphs survive restarts.
 
 ## Build
 
