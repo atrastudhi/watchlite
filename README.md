@@ -9,10 +9,10 @@ An ultra-lightweight, single-binary server monitor with an embedded web dashboar
 ![watchlite dashboard](assets/dashboard.gif)
 
 - **Single static binary under 1 MB**, ~11 MB RSS, ~0.1% CPU — no runtime, no dependencies, nothing to install
-- **Embedded web dashboard** (vanilla HTML/CSS/JS, dark htop-style theme) served by the binary itself
+- **Embedded web dashboard** (vanilla HTML/CSS/JS, htop-style; dark or light theme) served by the binary itself
 - **Metrics**: CPU (model, total + per-core), memory/swap, load average, disk usage + I/O rates, network throughput, temperatures + fans, TCP connections + listening ports, full sortable process list with states, Docker/Podman containers
 - **History**: ring buffer (1h default) served at `/api/history` — charts survive page reloads *and* process restarts (saved to a small state file once a minute)
-- **Alerts**: `--alert cpu>90` style thresholds with hysteresis; events log to stderr and optionally POST to a webhook
+- **Alerts**: thresholds on cpu/mem/swap/disk (percent) and temperature (°C), scopable to one mount or sensor (`--alert 'disk:/data>85'`), with hysteresis; events log to stderr and optionally POST to a webhook
 - **Prometheus**: `/metrics` endpoint in text exposition format — drop-in Grafana/Prometheus integration
 - Container stats via the engine's unix socket with a hand-rolled client — Docker and Podman sockets are probed automatically (`--container-socket` overrides; rootless Podman needs `systemctl --user enable --now podman.socket`), gracefully hidden when no engine is present
 
