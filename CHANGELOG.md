@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 Entries from 0.1.1 onward are generated automatically by CI from conventional commits.
 
+## [0.12.0](https://github.com/atrastudhi/watchlite/compare/v0.11.0...v0.12.0) (2026-06-14)
+
+### Features
+
+* add a light/dark theme toggle to the dashboard (4418486)
+* flush chart history on SIGTERM/SIGINT so graphs survive restarts (c86e687)
+* add swap and temperature alerts with per-mount/sensor scoping (0453b0c)
+
+
 ## [0.11.0](https://github.com/atrastudhi/watchlite/compare/v0.10.0...v0.11.0) (2026-06-14)
 
 ### Features
