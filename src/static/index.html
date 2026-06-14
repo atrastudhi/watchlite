@@ -6,6 +6,7 @@
 <title>watchlite</title>
 <link rel="icon" href="/favicon.svg">
 <link rel="stylesheet" href="/style.css">
+<script>try{if(localStorage.getItem("wl-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
 </head>
 <body>
 <header>
@@ -13,6 +14,7 @@
   <div id="host-info" class="host-info">connecting&hellip;</div>
   <div id="alerts" class="alert-chip" hidden></div>
   <div id="clock" class="clock"></div>
+  <button id="theme-toggle" class="theme-btn" title="toggle light/dark theme" aria-label="toggle theme">◐</button>
   <div id="conn" class="conn-dot" title="connection status"></div>
 </header>
 

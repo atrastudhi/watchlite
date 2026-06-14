@@ -70,8 +70,8 @@ function drawChart(canvas, series, max) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  // gridlines at 25/50/75%
-  ctx.strokeStyle = "#181e27";
+  // gridlines at 25/50/75% — pull the colour from CSS so it tracks the theme
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--grid").trim() || "#181e27";
   ctx.lineWidth = 1;
   for (const f of [0.25, 0.5, 0.75]) {
     const y = Math.round(h * f) + 0.5;
@@ -125,7 +125,7 @@ function render(d) {
   $("alerts").hidden = !d.alerts.length;
   if (d.alerts.length) {
     $("alerts").textContent =
-      "▲ " + d.alerts.map((a) => `${a.metric} ${a.value}% > ${a.threshold}%`).join(" · ");
+      "▲ " + d.alerts.map((a) => { const u = a.unit || "%"; return `${a.metric} ${a.value}${u} > ${a.threshold}${u}`; }).join(" · ");
   }
 
   // cpu
@@ -350,6 +350,15 @@ $("proc-head").addEventListener("click", (e) => {
   sortDir = sortKey === key ? -sortDir : (key === "name" ? 1 : -1);
   sortKey = key;
   if (lastData) render(lastData);
+});
+
+// theme toggle — the <head> applied the saved theme already; this flips it
+$("theme-toggle").addEventListener("click", () => {
+  const light = document.documentElement.getAttribute("data-theme") === "light";
+  if (light) document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", "light");
+  try { localStorage.setItem("wl-theme", light ? "dark" : "light"); } catch { /* private mode */ }
+  if (lastData) render(lastData); // redraw charts with the new gridline colour
 });
 
 // clock

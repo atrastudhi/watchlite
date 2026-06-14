@@ -13,6 +13,21 @@
   --accent: #58a6ff;
 }
 
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --panel-2: #eaeef2;
+  --border: #d0d7de;
+  --grid: #e4e8ec;
+  --fg: #1f2328;
+  --dim: #57606a;
+  --faint: #8c959f;
+  --green: #1a7f37;
+  --yellow: #9a6700;
+  --red: #cf222e;
+  --accent: #0969da;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -71,6 +86,18 @@ header {
 }
 
 .clock { color: var(--dim); font-size: 11px; white-space: nowrap; }
+
+.theme-btn {
+  background: none;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex: none;
+}
+.theme-btn:hover { color: var(--fg); }
 
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
 .conn-dot.ok { background: var(--green); }
