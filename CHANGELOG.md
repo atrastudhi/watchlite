@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versioning follows [SemVer](https://semver.org/).
 Entries from 0.1.1 onward are generated automatically by CI from conventional commits.
 
+## [0.11.0](https://github.com/atrastudhi/watchlite/compare/v0.10.0...v0.11.0) (2026-06-14)
+
+### Features
+
+* always show the containers panel with the reason it is empty (1ac7c03)
+
+
 ## [0.10.0](https://github.com/atrastudhi/watchlite/compare/v0.9.0...v0.10.0) (2026-06-11)
 
 ### Features
